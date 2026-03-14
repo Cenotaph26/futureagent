@@ -38,15 +38,14 @@ COPY app ./app
 COPY pyproject.toml README.md ./
 COPY frontend_static ./frontend_static
 
-# $PORT shell expansion için startup script
-RUN printf '#!/bin/sh\nexec python -m uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}" --workers 1\n' \
-    > /start.sh && chmod +x /start.sh
-
 RUN mkdir -p /app/logs /app/data
+
+# Python ile port oku — shell expansion sorunu yok
+COPY start.py /start.py
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=5 \
     CMD curl -sf "http://localhost:${PORT:-8000}/api/health" || exit 1
 
 EXPOSE 8000
 
-CMD ["/start.sh"]
+CMD ["python", "/start.py"]
