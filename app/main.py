@@ -1,5 +1,5 @@
 """
-FuturAgents — FastAPI Ana Uygulama (Scheduler dahil)
+FuturAgents — FastAPI Ana Uygulama
 """
 import logging
 import sys
@@ -32,9 +32,18 @@ _scheduler = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global _scheduler
+
+    # ── Tüm env değişkenlerini logla (debug için) ─────────────────────
+    mongo_vars = {k: v[:20]+"***" if len(v) > 20 else v
+                  for k, v in os.environ.items()
+                  if "MONGO" in k.upper()}
+    redis_vars = {k: v[:10]+"***" if len(v) > 10 else v
+                  for k, v in os.environ.items()
+                  if "REDIS" in k.upper()}
+    logger.info(f"🔍 MONGO env vars: {mongo_vars}")
+    logger.info(f"🔍 REDIS env vars: {redis_vars}")
     logger.info(f"🚀 {settings.APP_NAME} v{settings.APP_VERSION} başlatılıyor...")
-    logger.info(f"   Mod: {'⚠️  TESTNET' if settings.BINANCE_TESTNET else '🔴 MAINNET (GERÇEK PARA!)'}")
-    logger.info(f"   LLM: {settings.ANTHROPIC_MODEL}")
+    logger.info(f"   Mod: {'⚠️  TESTNET' if settings.BINANCE_TESTNET else '🔴 MAINNET'}")
 
     await connect_mongo()
     await connect_redis()
@@ -42,7 +51,6 @@ async def lifespan(app: FastAPI):
 
     _scheduler = create_scheduler()
     _scheduler.start()
-    logger.info("✅ Scheduler başlatıldı — saatlik tarama aktif")
     logger.info("✅ Tüm servisler hazır")
     yield
 
@@ -55,23 +63,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="FuturAgents API",
-    description="""
-## 🤖 AI Multi-Agent Binance Futures Trading System
-
-Claude Opus / Sonnet / Haiku üçlüsünü kullanan çok-ajanlı futures analiz platformu.
-
-### Agents
-- **Technical Agent** (Haiku) — OHLCV + 10+ indikatör
-- **Sentiment Agent** (Sonnet) — Funding, L/S oranı, tasfiyeler
-- **Risk Agent** (Haiku) — ATR bazlı pozisyon boyutu
-- **Orchestrator** (Opus) — Nihai karar
-
-### Özellikler
-- Binance Futures Testnet & Mainnet
-- SSE streaming ile gerçek zamanlı takip
-- Saatlik otomatik piyasa taraması
-- JWT auth, MongoDB kayıt, Redis cache
-    """,
+    description="AI Multi-Agent Binance Futures Trading System",
     version=settings.APP_VERSION,
     docs_url="/docs",
     redoc_url="/redoc",
