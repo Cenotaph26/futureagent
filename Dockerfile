@@ -36,12 +36,13 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 
 COPY app ./app
 COPY pyproject.toml README.md ./
-COPY frontend_static ./frontend_static
-
-RUN mkdir -p /app/logs /app/data
-
-# Python ile port oku — shell expansion sorunu yok
 COPY start.py /start.py
+
+# frontend_static dizinini oluştur (COPY sırasında hata vermesin)
+RUN mkdir -p /app/frontend_static /app/logs /app/data
+
+# index.html varsa kopyala
+COPY frontend_static/ ./frontend_static/
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=5 \
     CMD curl -sf "http://localhost:${PORT:-8000}/api/health" || exit 1
