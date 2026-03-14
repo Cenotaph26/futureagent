@@ -1,5 +1,4 @@
 # FuturAgents — Railway Optimized Dockerfile
-# Multi-stage build: daha küçük final image
 FROM python:3.11-slim-bookworm AS builder
 
 WORKDIR /build
@@ -18,7 +17,7 @@ RUN pip install --prefer-binary --no-cache-dir \
     rich psutil pytz tqdm plotly \
     concurrent-log-handler
 
-# ── Final Image ─────────────────────────────────────────────────────────────
+# ── Final Image ────────────────────────────────────────────────────────────
 FROM python:3.11-slim-bookworm
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -29,25 +28,25 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Sistem araçları
 RUN apt-get update && apt-get install -y --no-install-recommends curl && \
     rm -rf /var/lib/apt/lists/*
 
-# Python paketlerini builder'dan kopyala
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
-# Uygulama kodu
 COPY app ./app
 COPY pyproject.toml README.md ./
+COPY frontend_static ./frontend_static
 
-# Dizinler
-RUN mkdir -p /app/logs /app/data /app/frontend_static
+# $PORT shell expansion için startup script
+RUN printf '#!/bin/sh\nexec python -m uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}" --workers 1\n' \
+    > /start.sh && chmod +x /start.sh
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:${PORT}/api/health || exit 1
+RUN mkdir -p /app/logs /app/data
 
-EXPOSE ${PORT}
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=5 \
+    CMD curl -sf "http://localhost:${PORT:-8000}/api/health" || exit 1
 
-CMD python -m uvicorn app.main:app --host 0.0.0.0 --port ${PORT} --workers 1
+EXPOSE 8000
+
+CMD ["/start.sh"]
