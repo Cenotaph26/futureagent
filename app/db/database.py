@@ -15,12 +15,14 @@ _redis_client: aioredis.Redis | None = None
 async def connect_mongo() -> None:
     global _mongo_client
     url = settings.effective_mongodb_url
-    logger.info(f"MongoDB bağlanıyor: {url.split('@')[-1]}")  # şifreyi loglamaz
+    # Şifreyi loglamadan host kısmını göster
+    safe_url = url.split("@")[-1] if "@" in url else url
+    logger.info(f"MongoDB bağlanıyor: {safe_url}")
     _mongo_client = AsyncIOMotorClient(
         url,
         serverSelectionTimeoutMS=10000,
-        maxPoolSize=20,
-        minPoolSize=2,
+        maxPoolSize=10,
+        minPoolSize=1,
     )
     await _mongo_client.admin.command("ping")
     logger.info("✅ MongoDB bağlantısı kuruldu")
@@ -35,12 +37,13 @@ async def disconnect_mongo() -> None:
 async def connect_redis() -> None:
     global _redis_client
     url = settings.effective_redis_url
-    logger.info(f"Redis bağlanıyor: {url.split('@')[-1]}")
+    safe_url = url.split("@")[-1] if "@" in url else url
+    logger.info(f"Redis bağlanıyor: {safe_url}")
     _redis_client = await aioredis.from_url(
         url,
         encoding="utf-8",
         decode_responses=True,
-        max_connections=20,
+        max_connections=10,
     )
     await _redis_client.ping()
     logger.info("✅ Redis bağlantısı kuruldu")
@@ -65,12 +68,17 @@ def get_redis() -> aioredis.Redis:
 
 
 async def ensure_indexes() -> None:
-    db = get_db()
-    await db.users.create_index("email", unique=True)
-    await db.users.create_index("username", unique=True)
-    await db.positions.create_index([("symbol", 1), ("status", 1)])
-    await db.analyses.create_index([("symbol", 1), ("created_at", -1)])
-    await db.signals.create_index([("symbol", 1), ("created_at", -1)])
-    await db.orders.create_index("binance_order_id", unique=True, sparse=True)
-    await db.trade_logs.create_index("created_at")
-    logger.info("✅ MongoDB indeksleri oluşturuldu")
+    """
+    Index oluşturma — disk dolu olduğunda atla.
+    Index'ler olmadan uygulama çalışır, sadece yavaş sorgular olabilir.
+    """
+    try:
+        db = get_db()
+        await db.users.create_index("email", unique=True)
+        await db.users.create_index("username", unique=True)
+        await db.analyses.create_index([("symbol", 1), ("created_at", -1)])
+        await db.signals.create_index([("symbol", 1), ("created_at", -1)])
+        logger.info("✅ MongoDB indeksleri oluşturuldu")
+    except Exception as e:
+        # Disk dolu veya başka hata — index olmadan devam et
+        logger.warning(f"⚠️ Index oluşturulamadı (uygulama çalışmaya devam eder): {e}")
