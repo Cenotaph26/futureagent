@@ -1,14 +1,12 @@
 """
 FuturAgents — Core Configuration
-Railway MongoDB plugin şu variable'ları inject eder:
-  MONGOHOST, MONGOPORT, MONGOUSER, MONGOPASSWORD, MONGO_URL, MONGODB_URL
-Hepsini dener, bulunanı kullanır.
 """
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
 from typing import Optional
 from functools import lru_cache
 import os
+import re
 
 
 class Settings(BaseSettings):
@@ -27,11 +25,11 @@ class Settings(BaseSettings):
     WORKERS: int = 1
     CORS_ORIGINS: str = "*"
 
-    # ── MongoDB — tüm olası Railway inject adları ─────────────────────
-    MONGODB_URL: Optional[str] = None       # Manuel eklenen
-    MONGO_URL: Optional[str] = None         # Railway MONGO_URL
-    MONGO_PRIVATE_URL: Optional[str] = None # Railway private URL
-    MONGOHOST: Optional[str] = None         # Railway ayrı parçalar
+    # ── MongoDB ───────────────────────────────────────────────────────
+    MONGODB_URL: Optional[str] = None
+    MONGO_URL: Optional[str] = None
+    MONGO_PRIVATE_URL: Optional[str] = None
+    MONGOHOST: Optional[str] = None
     MONGOPORT: Optional[str] = None
     MONGOUSER: Optional[str] = None
     MONGOPASSWORD: Optional[str] = None
@@ -88,15 +86,6 @@ class Settings(BaseSettings):
 
     @property
     def effective_mongodb_url(self) -> str:
-        """
-        Railway MongoDB URL'sini şu sırayla dener:
-        1. MONGODB_URL
-        2. MONGO_URL
-        3. MONGO_PRIVATE_URL
-        4. MONGOHOST/MONGOPORT/MONGOPASSWORD parçalarından yeniden inşa
-        5. os.environ'dan direkt okuma (pydantic görmese bile)
-        """
-        # pydantic field'lardan dene
         candidates = [
             self.MONGODB_URL,
             self.MONGO_URL,
@@ -106,54 +95,77 @@ class Settings(BaseSettings):
             if url:
                 return self._finalize_mongo_url(url)
 
-        # os.environ'dan direkt dene (pydantic bazen görmez)
-        for key in ["MONGODB_URL", "MONGO_URL", "MONGO_PRIVATE_URL",
-                    "MONGO_PRIVATE_URL", "DATABASE_URL"]:
+        for key in ["MONGODB_URL", "MONGO_URL", "MONGO_PRIVATE_URL", "DATABASE_URL"]:
             val = os.environ.get(key)
             if val and val.startswith("mongodb"):
                 return self._finalize_mongo_url(val)
 
-        # Parçalardan URL inşa et
         host = self.MONGOHOST or os.environ.get("MONGOHOST")
         port = self.MONGOPORT or os.environ.get("MONGOPORT", "27017")
         user = self.MONGOUSER or os.environ.get("MONGOUSER", "mongo")
         pwd  = self.MONGOPASSWORD or os.environ.get("MONGOPASSWORD")
-
         if host and pwd:
             url = f"mongodb://{user}:{pwd}@{host}:{port}"
             return self._finalize_mongo_url(url)
 
-        # Hiçbiri yoksa tüm env'i logla ve hata ver
-        all_mongo = {k: "***" for k in os.environ if "MONGO" in k.upper()}
-        raise RuntimeError(
-            f"MongoDB URL bulunamadı! "
-            f"Mevcut MONGO* değişkenler: {all_mongo}. "
-            f"Railway Variables'a MONGODB_URL ekle."
-        )
+        raise RuntimeError("MongoDB URL bulunamadı! MONGODB_URL variable'ını ekle.")
 
     def _finalize_mongo_url(self, url: str) -> str:
-        """URL'ye /futuragents ve ?authSource=admin ekle"""
-        if "/futuragents" not in url:
-            url = url.rstrip("/") + "/futuragents"
-        if "authSource" not in url:
-            sep = "&" if "?" in url else "?"
-            url += f"{sep}authSource=admin"
-        return url
+        """
+        URL'yi normalize et:
+        - Çift slash'ları temizle
+        - /futuragents ekle (yoksa)
+        - ?authSource=admin ekle (yoksa)
+        """
+        # Önce query string'i ayır
+        if "?" in url:
+            base, query = url.split("?", 1)
+        else:
+            base, query = url, ""
+
+        # host:port kısmından sonraki path'i parse et
+        # mongodb://user:pass@host:port/dbname  formatı
+        # Regex: protocol://credentials@host:port/path
+        match = re.match(r"^(mongodb(?:\+srv)?://[^/]+/?)(.*)$", base)
+        if match:
+            prefix = match.group(1).rstrip("/")  # mongodb://...@host:port
+            path   = match.group(2).strip("/")   # mevcut db adı (varsa)
+
+            if not path or path == "":
+                # DB adı yok, ekle
+                new_base = f"{prefix}/futuragents"
+            elif path == "futuragents":
+                # Zaten doğru
+                new_base = f"{prefix}/futuragents"
+            else:
+                # Başka bir db adı var, futuragents ile değiştir
+                new_base = f"{prefix}/futuragents"
+        else:
+            new_base = base.rstrip("/") + "/futuragents"
+
+        # query string'i yeniden ekle
+        if query:
+            # authSource yoksa ekle
+            if "authSource" not in query:
+                final = f"{new_base}?{query}&authSource=admin"
+            else:
+                final = f"{new_base}?{query}"
+        else:
+            final = f"{new_base}?authSource=admin"
+
+        return final
 
     @property
     def effective_redis_url(self) -> str:
-        # pydantic field'lardan
         for url in [self.REDIS_URL, self.REDIS_PRIVATE_URL]:
             if url:
                 return url
 
-        # os.environ'dan
         for key in ["REDIS_URL", "REDIS_PRIVATE_URL"]:
             val = os.environ.get(key)
             if val:
                 return val
 
-        # Parçalardan inşa
         host = self.REDISHOST or os.environ.get("REDISHOST")
         port = self.REDISPORT or os.environ.get("REDISPORT", "6379")
         pwd  = self.REDISPASSWORD or os.environ.get("REDISPASSWORD")
@@ -164,12 +176,7 @@ class Settings(BaseSettings):
         if host:
             return f"redis://{host}:{port}"
 
-        all_redis = {k: "***" for k in os.environ if "REDIS" in k.upper()}
-        raise RuntimeError(
-            f"Redis URL bulunamadı! "
-            f"Mevcut REDIS* değişkenler: {all_redis}. "
-            f"Railway Variables'a REDIS_URL ekle."
-        )
+        raise RuntimeError("Redis URL bulunamadı! REDIS_URL variable'ını ekle.")
 
     @property
     def binance_testnet_futures_url(self) -> str:
