@@ -327,17 +327,42 @@ Tüm bu bilgileri sentezle. Hafıza ve anomali verileri kararında önemli rol o
             results = {"main_order": order, "executed": True, "direction": direction, "quantity": quantity}
 
             sl_side = "SELL" if direction == "LONG" else "BUY"
+
+            # SL/TP fiyat doğrulama
+            entry = float(decision.get("entry_price") or 0)
+            sl_float = float(stop_loss)
+            tp1_float = float(tp1) if tp1 else 0
+
+            # LONG: SL entry'den düşük, TP entry'den yüksek olmalı
+            # SHORT: SL entry'den yüksek, TP entry'den düşük olmalı
+            if direction == "LONG":
+                if entry > 0 and sl_float >= entry:
+                    logger.warning(f"[Execute] SL ({sl_float}) >= entry ({entry}), düzeltiliyor")
+                    sl_float = round(entry * 0.98, 4)
+                if entry > 0 and tp1_float > 0 and tp1_float <= entry:
+                    logger.warning(f"[Execute] TP ({tp1_float}) <= entry ({entry}), düzeltiliyor")
+                    tp1_float = round(entry * 1.02, 4)
+            else:  # SHORT
+                if entry > 0 and sl_float <= entry:
+                    logger.warning(f"[Execute] SL ({sl_float}) <= entry ({entry}), düzeltiliyor")
+                    sl_float = round(entry * 1.02, 4)
+                if entry > 0 and tp1_float > 0 and tp1_float >= entry:
+                    logger.warning(f"[Execute] TP ({tp1_float}) >= entry ({entry}), düzeltiliyor")
+                    tp1_float = round(entry * 0.98, 4)
+
             try:
                 results["stop_loss_order"] = await self.binance.place_stop_order(
-                    symbol, sl_side, float(quantity), float(stop_loss), "STOP_MARKET")
+                    symbol, sl_side, float(quantity), sl_float, "STOP_MARKET")
+                logger.info(f"[Execute] SL emri: {sl_float}")
             except Exception as e:
                 results["stop_loss_error"] = str(e)
                 logger.warning(f"[Execute] SL emir hatası: {e}")
 
-            if tp1:
+            if tp1_float > 0:
                 try:
                     results["take_profit_order"] = await self.binance.place_stop_order(
-                        symbol, sl_side, float(quantity), float(tp1), "TAKE_PROFIT_MARKET")
+                        symbol, sl_side, float(quantity), tp1_float, "TAKE_PROFIT_MARKET")
+                    logger.info(f"[Execute] TP emri: {tp1_float}")
                 except Exception as e:
                     results["take_profit_error"] = str(e)
                     logger.warning(f"[Execute] TP emir hatası: {e}")

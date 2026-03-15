@@ -252,20 +252,20 @@ class BinanceFuturesClient:
         side: str,
         quantity: float,
         stop_price: float,
-        order_type: str = "STOP_MARKET",  # STOP_MARKET veya TAKE_PROFIT_MARKET
+        order_type: str = "STOP_MARKET",
     ) -> dict:
-        """Stop-loss / Take-profit emri"""
-        return await self._post(
-            "/fapi/v1/order",
-            {
-                "symbol": symbol,
-                "side": side,
-                "type": order_type,
-                "quantity": self._format_quantity(quantity, symbol),
-                "stopPrice": f"{stop_price:.4f}",
-                "reduceOnly": "true",
-            },
-        )
+        """Stop-loss / Take-profit emri — closePosition=true ile basit kapat"""
+        params = {
+            "symbol": symbol,
+            "side": side,
+            "type": order_type,
+            "stopPrice": f"{stop_price:.4f}",
+            "closePosition": "true",  # quantity yerine closePosition kullan
+            "timeInForce": "GTE_GTC",
+            "workingType": "CONTRACT_PRICE",
+            "priceProtect": "true",
+        }
+        return await self._post("/fapi/v1/order", params)
 
     async def cancel_order(self, symbol: str, order_id: int) -> dict:
         """Emri iptal et"""
