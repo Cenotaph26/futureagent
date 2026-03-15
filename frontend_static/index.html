@@ -984,8 +984,45 @@ function handleSSE(ev,d,t0){
 }
 
 async function triggerScan(){
-  log('Manuel tarama — tüm 5 coin','info','SYS');toast('Tarama başlatıldı','info');
-  try{await fetch(`${API}/api/analysis/run`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({symbol:'BTCUSDT',interval:'1h',auto_execute:S.autoExec})});}catch(e){}
+  const ae=S.autoExec;
+  log(`Manuel tarama — tüm 5 coin (auto_exec=${ae})`,'info','SYS');
+  toast('Tarama başlatıldı — 5 coin','info');
+  // Tüm 5 coini sırayla analiz et
+  for(const coin of COINS){
+    try{
+      log(`${coin} analiz başlatılıyor...`,'info','SYS');
+      const r=await fetch(`${API}/api/analysis/run`,{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({symbol:coin,interval:S.atf||'1h',auto_execute:ae})
+      });
+      if(!r.ok){log(`${coin}: HTTP ${r.status}`,'err','SYS');continue;}
+      // SSE stream'i oku
+      const reader=r.body.getReader();const dec=new TextDecoder();let buf='';
+      while(true){
+        const{done,value}=await reader.read();if(done)break;
+        buf+=dec.decode(value,{stream:true});
+        const parts=buf.split('\n\n');buf=parts.pop();
+        for(const p of parts){
+          const em=p.match(/^event: (.+)$/m),dm=p.match(/^data: (.+)$/m);
+          if(!em||!dm)continue;
+          try{
+            const ev=em[1].trim(),d=JSON.parse(dm[1]);
+            if(ev==='decision'){
+              log(`${coin}: ${d.decision} (${d.confidence}/100)${d.auto_executed?' → POZİSYON AÇILDI':''}`,
+                d.auto_executed?'trade':'agent',d.auto_executed?'TRADE':'ORCH');
+              if(d.auto_executed)toast(`✅ ${coin} ${d.direction} pozisyon açıldı!`,'trade');
+              if(d.execution_error)log(`${coin} emir hatası: ${d.execution_error}`,'err','TRADE');
+              cs[coin].analysis={...cs[coin].analysis,final_decision:d};
+              if(d.decision==='EXECUTE')cs[coin].signal=d;
+            }
+          }catch(ex){}
+        }
+      }
+    }catch(e){log(`${coin}: ${e.message}`,'err','SYS');}
+  }
+  loadPositions();
+  if(document.getElementById('pcoin').style.display!=='none')renderCoinCards();
+  log('Manuel tarama tamamlandı','ok','SYS');
 }
 
 // ── POSITIONS ──
