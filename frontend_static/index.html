@@ -472,19 +472,22 @@ function toast(msg,type='info'){
   document.getElementById('toasts').appendChild(el);setTimeout(()=>el.remove(),4500);
 }
 
+// ── State kalıcılığı — localStorage ──
+const LS={
+  save(k,v){try{localStorage.setItem('fa_'+k,JSON.stringify(v));}catch(e){}},
+  load(k,d){try{const v=localStorage.getItem('fa_'+k);return v!=null?JSON.parse(v):d;}catch(e){return d;}}
+};
+
 // Tab switching
 function swTab(n,btn){
   document.querySelectorAll('.tb').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   document.querySelectorAll('.pane').forEach(p=>{p.classList.remove('active','grid');p.style.display='none';});
   const pane=document.getElementById('p-'+n);
-  if(pane){
-    pane.style.display='';
-    pane.classList.add('active');
-    if(['overview','news','analytics'].includes(n))pane.classList.add('grid');
-  }
+  if(pane){pane.style.display='';pane.classList.add('active');if(['overview','news','analytics'].includes(n))pane.classList.add('grid');}
+  LS.save('tab',n);
   if(n==='overview')setTimeout(()=>{if(chart)chart.timeScale().fitContent();},100);
-  if(n==='coins'){renderAllCoinCards();}
+  if(n==='coins')renderAllCoinCards();
   if(n==='analytics')renderAnalytics();
 }
 
@@ -493,18 +496,18 @@ function selCoin(btn,coin){
   document.querySelectorAll('.tick').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');S.coin=coin;
   document.getElementById('ch-sym').textContent=coin;
-  loadChart();updateSigPanel();
+  LS.save('coin',coin);loadChart();updateSigPanel();
 }
 function selATF(btn,tf){
   document.querySelectorAll('.tp').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');S.atf=tf;
+  btn.classList.add('active');S.atf=tf;LS.save('atf',tf);
 }
 function setChartTF(btn,tf){
   document.querySelectorAll('.tfb').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');S.chartTF=tf;loadChart();
+  btn.classList.add('active');S.chartTF=tf;LS.save('chartTF',tf);loadChart();
 }
 function onAuto(cb){
-  S.autoExec=cb.checked;
+  S.autoExec=cb.checked;LS.save('autoexec',cb.checked);
   document.getElementById('auto-tag').style.display=S.autoExec?'block':'none';
 }
 
@@ -1067,14 +1070,20 @@ async function preloadData(){
         const sym=doc.symbol;
         if(!sym||!COINS.includes(sym))return;
         const fd=doc.final_decision||{};
-        if(!coinState[sym].analysis||fd.confidence>=(coinState[sym].analysis?.final_decision?.confidence||0)){
-          coinState[sym].analysis={final_decision:fd,technical_1h:doc.technical_1h||{},sentiment:doc.sentiment||{}};
+        const existing=coinState[sym].analysis?.final_decision;
+        if(!existing||(fd.confidence||0)>=(existing.confidence||0)){
+          coinState[sym].analysis={
+            final_decision:fd,
+            technical_1h:doc.technical_1h||{},
+            sentiment:doc.sentiment||{}
+          };
           if(fd.decision==='EXECUTE')coinState[sym].signal=fd;
         }
       });
       log(`Geçmiş: ${history.length} analiz yüklendi`,'info','SYS');
     }
-    // 2. Redis'ten son sinyalleri yükle
+
+    // 2. Son sinyalleri yükle
     const sigs = await fetch(`${API}/api/signals?limit=20`).then(r=>r.json()).catch(()=>[]);
     if(Array.isArray(sigs)){
       sigs.forEach(s=>{
@@ -1083,40 +1092,75 @@ async function preloadData(){
         if(fd.decision==='EXECUTE'&&!coinState[sym].signal)coinState[sym].signal=fd;
       });
     }
-    // 3. Redis'ten son haberleri yükle
-    const newsRaw = await fetch(`${API}/api/stream/news`).then(()=>null).catch(()=>null);
-    // News DB'den direkt çek
-    const newsHistory = await fetch(`${API}/api/analysis/history?limit=5`).then(()=>null).catch(()=>null);
-    // Redis'teki news_latest'i çek (özel endpoint)
+
+    // 3. Son haberleri yükle — addNewsItem yerine buildNI + direkt render
     const latestNews = await fetch(`${API}/api/news/latest`).then(r=>r.json()).catch(()=>null);
     if(latestNews&&typeof latestNews==='object'){
       Object.entries(latestNews).forEach(([sym,news])=>{
-        if(typeof news==='object'&&news.overall_sentiment)addNewsItem(sym,news);
+        if(typeof news==='object'&&news.overall_sentiment){
+          const item=buildNI(sym,news);
+          if(item){
+            newsStore.unshift(item);
+          }
+        }
       });
+      if(newsStore.length>0){
+        renderNewsList();
+        renderNewsFullList();
+        document.getElementById('nc-count').textContent=newsStore.length+' haber';
+      }
     }
+
+    // 4. Grafik yükle (preload bittikten sonra)
+    setTimeout(()=>loadChart(),100);
+
   }catch(e){log('Preload hatası: '+e.message,'warn','SYS');}
 }
 
-// News latest API endpoint — Redis'ten oku
-// (bu endpoint yoksa stream'den alır)
-async function loadLatestNewsFromDB(){
-  try{
-    // news_analysis koleksiyonundan son kayıtları çek
-    const r = await fetch(`${API}/api/signals/stats`).then(()=>null).catch(()=>null);
-    // Her coin için Redis cache'i kontrol et
-    for(const sym of COINS){
-      try{
-        const r2 = await fetch(`${API}/api/market/ticker/${sym}`).then(()=>null).catch(()=>null);
-      }catch(e){}
-    }
-  }catch(e){}
-}
+// ── Init — tüm state localStorage'dan geri yükle ──
+(function restoreState(){
+  // Auto execute
+  const autoExec=LS.load('autoexec',false);
+  if(autoExec){
+    const cb=document.getElementById('autoex');cb.checked=true;S.autoExec=true;
+    document.getElementById('auto-tag').style.display='block';
+  }
+  // Coin
+  const coin=LS.load('coin','BTCUSDT');
+  if(coin!=='BTCUSDT'){
+    S.coin=coin;
+    document.getElementById('ch-sym').textContent=coin;
+    document.querySelectorAll('.tick').forEach(b=>{
+      if(b.getAttribute('onclick')?.includes(coin))b.classList.add('active');
+      else b.classList.remove('active');
+    });
+  }
+  // Chart TF
+  const chartTF=LS.load('chartTF','1h');
+  if(chartTF!=='1h'){
+    S.chartTF=chartTF;
+    document.querySelectorAll('.tfb').forEach(b=>{
+      b.classList.toggle('active',b.textContent===chartTF);
+    });
+  }
+  // Analysis TF
+  const atf=LS.load('atf','1h');
+  if(atf!=='1h'){
+    S.atf=atf;
+    document.querySelectorAll('.tp').forEach(b=>{
+      b.classList.toggle('active',b.textContent===atf);
+    });
+  }
+  // Active tab — son
+  const tab=LS.load('tab','overview');
+  if(tab&&tab!=='overview'){
+    const tabBtn=Array.from(document.querySelectorAll('.tb')).find(b=>b.getAttribute('onclick')?.includes(`'${tab}'`));
+    if(tabBtn)swTab(tab,tabBtn);
+  }
+})();
 
-// Init
 checkHealth();loadPositions();
-preloadData();
-startDash();startNews();
-setTimeout(()=>loadChart(),300);
+preloadData();startDash();startNews();
 setInterval(loadPositions,20000);setInterval(checkHealth,30000);setInterval(()=>loadChart(),60000);
 </script>
 </body>

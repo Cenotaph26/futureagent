@@ -228,7 +228,7 @@ Tüm bu bilgileri sentezle. Hafıza ve anomali verileri kararında önemli rol o
 }}"""
 
         try:
-            return await self.llm.complete_json(
+            result = await self.llm.complete_json(
                 system=ORCHESTRATOR_SYSTEM,
                 user=user_prompt,
                 model_tier="analyst",   # Sonnet — Opus değil, dengeli
@@ -237,6 +237,48 @@ Tüm bu bilgileri sentezle. Hafıza ve anomali verileri kararında önemli rol o
         except Exception as e:
             logger.error(f"Orchestrator LLM hatası: {e}")
             return {"decision": "ABORT", "reasoning": str(e), "confidence": 0}
+
+        # ── KRITIK: Stop/TP değerlerini risk agent'tan al, LLM'den değil ──
+        # LLM bazen fiyatla uyumsuz değerler üretir. Risk agent ATR bazlı hesaplar.
+        if risk and result.get("decision") == "EXECUTE":
+            levels = risk.get("levels", {})
+            sizing = risk.get("sizing", {})
+            current_price = tech_1h.get("current_price", 0)
+
+            # Risk agent'ın hesapladığı SL/TP'yi kullan
+            if levels.get("stop_loss") and levels.get("take_profit_1"):
+                # Sanity check: SL fiyatın %20'sinden uzakta değil mi?
+                sl = levels["stop_loss"]
+                if current_price > 0 and abs(sl - current_price) / current_price < 0.20:
+                    result["stop_loss"] = sl
+                    result["take_profit_1"] = levels.get("take_profit_1")
+                    result["take_profit_2"] = levels.get("take_profit_2")
+                else:
+                    # ATR bazlı manuel hesapla
+                    atr_val = tech_1h.get("indicators", {}).get("atr_14", 0)
+                    direction = result.get("direction", "LONG")
+                    if current_price > 0 and atr_val > 0:
+                        atr_float = float(atr_val)
+                        if direction == "LONG":
+                            result["stop_loss"] = round(current_price - atr_float * 1.5, 4)
+                            result["take_profit_1"] = round(current_price + atr_float * 2.0, 4)
+                            result["take_profit_2"] = round(current_price + atr_float * 4.0, 4)
+                        else:
+                            result["stop_loss"] = round(current_price + atr_float * 1.5, 4)
+                            result["take_profit_1"] = round(current_price - atr_float * 2.0, 4)
+                            result["take_profit_2"] = round(current_price - atr_float * 4.0, 4)
+
+            # entry_price'ı gerçek piyasa fiyatından al
+            if current_price > 0:
+                result["entry_price"] = current_price
+
+            # quantity ve leverage'ı risk agent'tan al
+            if sizing.get("quantity"):
+                result["quantity"] = sizing["quantity"]
+            if sizing.get("leverage"):
+                result["leverage"] = sizing["leverage"]
+
+        return result
 
     async def _execute_trade(self, symbol, decision, risk):
         try:
