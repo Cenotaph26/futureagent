@@ -317,7 +317,11 @@ Tüm bu bilgileri sentezle. Hafıza ve anomali verileri kararında önemli rol o
             logger.info(f"[Execute] {symbol} {direction} qty={quantity} sl={stop_loss} tp={tp1} lev={leverage}x")
 
             await self.binance.set_leverage(symbol, int(leverage))
-            await self.binance.set_margin_type(symbol, "ISOLATED")
+            # Margin type — hata olursa devam et (zaten ISOLATED olabilir)
+            try:
+                await self.binance.set_margin_type(symbol, "ISOLATED")
+            except Exception as mt_err:
+                logger.info(f"[Execute] Margin type ayarlanamadı (zaten ayarlı olabilir): {mt_err}")
             side = "BUY" if direction == "LONG" else "SELL"
             order = await self.binance.place_market_order(symbol, side, float(quantity))
             results = {"main_order": order, "executed": True, "direction": direction, "quantity": quantity}

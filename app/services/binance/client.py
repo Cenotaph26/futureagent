@@ -193,9 +193,11 @@ class BinanceFuturesClient:
                 "/fapi/v1/marginType",
                 {"symbol": symbol, "marginType": margin_type},
             )
-        except httpx.HTTPStatusError as e:
-            # Zaten o moddaysa Binance hata döner, tolere et
-            if "already" in str(e.response.text).lower():
+        except Exception as e:
+            # 400 = zaten o moddaysa Binance hata döner, tolere et
+            err_str = str(e).lower()
+            if "400" in err_str or "already" in err_str or "no need" in err_str:
+                logger.debug(f"set_margin_type {symbol}: zaten ayarlı — {e}")
                 return {"msg": "already set"}
             raise
 
