@@ -122,7 +122,7 @@ async def get_analysis_history(
 
     cursor = db.analyses.find(
         query,
-        {"technical": 0, "sentiment": 0},  # Ham veriyi exclude et — sadece karar
+        {"technical_4h": 0},  # sadece 4h'ı exclude et, 1h ve sentiment kalsın
     ).sort("created_at", -1).limit(limit)
 
     results = []

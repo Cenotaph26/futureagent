@@ -1057,10 +1057,65 @@ async function checkHealth(){
   }catch(e){document.getElementById('d-api').className='dot';document.getElementById('l-api').textContent='Bağlantı Yok';}
 }
 
+// ── Sayfa açılınca DB'den geçmiş verileri yükle ──
+async function preloadData(){
+  try{
+    // 1. Geçmiş analizleri yükle — coin kartları için
+    const history = await fetch(`${API}/api/analysis/history?limit=50&days=7`).then(r=>r.json()).catch(()=>[]);
+    if(Array.isArray(history)){
+      history.forEach(doc=>{
+        const sym=doc.symbol;
+        if(!sym||!COINS.includes(sym))return;
+        const fd=doc.final_decision||{};
+        if(!coinState[sym].analysis||fd.confidence>=(coinState[sym].analysis?.final_decision?.confidence||0)){
+          coinState[sym].analysis={final_decision:fd,technical_1h:doc.technical_1h||{},sentiment:doc.sentiment||{}};
+          if(fd.decision==='EXECUTE')coinState[sym].signal=fd;
+        }
+      });
+      log(`Geçmiş: ${history.length} analiz yüklendi`,'info','SYS');
+    }
+    // 2. Redis'ten son sinyalleri yükle
+    const sigs = await fetch(`${API}/api/signals?limit=20`).then(r=>r.json()).catch(()=>[]);
+    if(Array.isArray(sigs)){
+      sigs.forEach(s=>{
+        const sym=s.symbol;if(!sym||!COINS.includes(sym))return;
+        const fd=s.final_decision||{};
+        if(fd.decision==='EXECUTE'&&!coinState[sym].signal)coinState[sym].signal=fd;
+      });
+    }
+    // 3. Redis'ten son haberleri yükle
+    const newsRaw = await fetch(`${API}/api/stream/news`).then(()=>null).catch(()=>null);
+    // News DB'den direkt çek
+    const newsHistory = await fetch(`${API}/api/analysis/history?limit=5`).then(()=>null).catch(()=>null);
+    // Redis'teki news_latest'i çek (özel endpoint)
+    const latestNews = await fetch(`${API}/api/news/latest`).then(r=>r.json()).catch(()=>null);
+    if(latestNews&&typeof latestNews==='object'){
+      Object.entries(latestNews).forEach(([sym,news])=>{
+        if(typeof news==='object'&&news.overall_sentiment)addNewsItem(sym,news);
+      });
+    }
+  }catch(e){log('Preload hatası: '+e.message,'warn','SYS');}
+}
+
+// News latest API endpoint — Redis'ten oku
+// (bu endpoint yoksa stream'den alır)
+async function loadLatestNewsFromDB(){
+  try{
+    // news_analysis koleksiyonundan son kayıtları çek
+    const r = await fetch(`${API}/api/signals/stats`).then(()=>null).catch(()=>null);
+    // Her coin için Redis cache'i kontrol et
+    for(const sym of COINS){
+      try{
+        const r2 = await fetch(`${API}/api/market/ticker/${sym}`).then(()=>null).catch(()=>null);
+      }catch(e){}
+    }
+  }catch(e){}
+}
+
 // Init
 checkHealth();loadPositions();
+preloadData();
 startDash();startNews();
-// Load chart after layout is rendered
 setTimeout(()=>loadChart(),300);
 setInterval(loadPositions,20000);setInterval(checkHealth,30000);setInterval(()=>loadChart(),60000);
 </script>

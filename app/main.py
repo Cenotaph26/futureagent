@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse
 
 from app.core.config import settings
 from app.db.database import connect_mongo, disconnect_mongo, connect_redis, disconnect_redis, ensure_indexes
-from app.api.routes import analysis, positions, market, auth, health, signals, backtest, alerts, stream
+from app.api.routes import analysis, positions, market, auth, health, signals, backtest, alerts, stream, news
 from app.tasks.scheduler import create_scheduler
 
 logging.basicConfig(level=getattr(logging, settings.LOG_LEVEL),
@@ -60,6 +60,7 @@ app.include_router(signals.router,   prefix="/api/signals",    tags=["Signals"])
 app.include_router(backtest.router,  prefix="/api/backtest",   tags=["Backtest"])
 app.include_router(alerts.router,    prefix="/api/alerts",     tags=["Alerts"])
 app.include_router(stream.router,    prefix="/api/stream",     tags=["Stream"])
+app.include_router(news.router,      prefix="/api/news",       tags=["News"])
 
 static_dir = "frontend_static"
 if os.path.isdir(static_dir) and os.listdir(static_dir):
