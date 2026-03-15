@@ -116,6 +116,9 @@ class Settings:
     STOP_LOSS_PERCENT: float = _get_float("STOP_LOSS_PERCENT", 0.02)
     TAKE_PROFIT_PERCENT: float = _get_float("TAKE_PROFIT_PERCENT", 0.04)
 
+    # Auto Execute — Railway Variable: AUTO_EXECUTE_ENABLED=true
+    AUTO_EXECUTE_ENABLED: bool = _get_bool("AUTO_EXECUTE_ENABLED", False)
+
     # Finnhub
     FINNHUB_API_KEY: str = _get("FINNHUB_API_KEY", "")
     FINNHUB_ENABLED: bool = _get_bool("FINNHUB_ENABLED", False)

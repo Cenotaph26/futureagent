@@ -131,7 +131,8 @@ async def auto_scan_and_trade() -> None:
             logger.info(f"  🔍 {symbol}: {consensus['dominant']} → tam analiz")
 
             # 2. Tam LLM analizi — AUTO EXECUTE = settings'den
-            auto_exec = settings.AUTO_EXECUTE_ENABLED
+            auto_exec = getattr(settings, "AUTO_EXECUTE_ENABLED", False)
+            logger.info(f"  {symbol}: auto_exec={auto_exec}")
             report = await orchestrator.analyze_and_decide(
                 symbol=symbol, interval="1h", auto_execute=auto_exec)
 
