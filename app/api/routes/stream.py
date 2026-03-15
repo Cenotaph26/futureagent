@@ -115,7 +115,7 @@ async def stream_news():
                         e["_id"] = str(e.get("_id", ""))
                     yield _sse("news_history", {"items": events})
 
-                await asyncio.sleep(120)  # 2 dakika
+                await asyncio.sleep(30)  # 30 saniye — haber yoksa bile kontrol
 
             except asyncio.CancelledError:
                 break

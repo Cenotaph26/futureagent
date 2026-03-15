@@ -194,13 +194,14 @@ async def scan_anomalies() -> None:
 
 async def refresh_news() -> None:
     try:
-        results = await NewsAgent().analyze_all_coins()
-        sentiments = {s: r.get("overall_sentiment","?") for s,r in results.items()}
-        # Redis'e yaz — dashboard canlı okur
-        redis = get_redis()
-        await redis.setex("futuragents:news_latest", 7200,
-                          json.dumps(results, default=str))
-        logger.info(f"[News] {sentiments}")
+        agent = NewsAgent()
+        # 5dk polling — sadece yeni haberler
+        new_items = await agent.poll_and_analyze()
+        if new_items:
+            sentiments = {r["symbol"]: r.get("overall_sentiment","?") for r in new_items}
+            logger.info(f"[News] {len(new_items)} yeni haber: {sentiments}")
+        else:
+            logger.debug("[News] Yeni haber yok")
     except Exception as e:
         logger.error(f"[News] {e}")
 
@@ -302,9 +303,9 @@ def create_scheduler() -> AsyncIOScheduler:
     s.add_job(scan_anomalies, IntervalTrigger(minutes=15),
               id="anomaly", name="Anomali Taraması", replace_existing=True, max_instances=1)
 
-    # Haber — saatlik
-    s.add_job(refresh_news, IntervalTrigger(hours=1),
-              id="news", name="Haber Analizi", replace_existing=True, max_instances=1)
+    # Haber — her 5 dakika (sadece yeni haberler analiz edilir, maliyet düşük)
+    s.add_job(refresh_news, IntervalTrigger(minutes=5),
+              id="news", name="Anlık Haber Analizi", replace_existing=True, max_instances=1)
 
     # Performans — 4 saatte bir
     s.add_job(track_performance, IntervalTrigger(hours=4),
