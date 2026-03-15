@@ -51,7 +51,7 @@ html,body{background:var(--bg0);color:var(--t1);font-family:var(--sans);font-siz
 .hclock{font-size:11px;color:var(--t2);font-family:var(--mono)}
 
 /* ─── MAIN CONTENT ─── */
-#content{display:flex;overflow:hidden;height:100%}
+#content{display:flex;overflow:hidden;height:100%;min-height:0}
 
 /* ─── LEFT PANEL ─── */
 #left{width:220px;flex-shrink:0;background:var(--bg1);border-right:1px solid var(--line);display:flex;flex-direction:column;overflow:hidden}
@@ -85,7 +85,7 @@ html,body{background:var(--bg0);color:var(--t1);font-family:var(--sans);font-siz
 .nopos{padding:16px;text-align:center;font-size:11px;color:var(--t3)}
 
 /* ─── CENTER ─── */
-#center{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+#center{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0;min-height:0}
 
 /* Tab bar */
 #tabbar{background:var(--bg1);border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 6px;flex-shrink:0}
@@ -94,15 +94,16 @@ html,body{background:var(--bg0);color:var(--t1);font-family:var(--sans);font-siz
 .tb-sep{flex:1}
 
 /* Panes */
-.pane{display:none;flex:1;overflow:hidden;flex-direction:column}
+.pane{display:none;flex:1;overflow:hidden;flex-direction:column;min-height:0}
 .pane.active{display:flex}
+.pane.active.grid{display:grid}
 
 /* ─── OVERVIEW PANE ─── */
-#p-overview{display:grid;grid-template-columns:1fr 320px;overflow:hidden}
+#p-overview{display:grid;grid-template-columns:1fr 320px;overflow:hidden;flex:1;min-height:0}
 
 /* Grafik + signal */
-.chart-col{display:flex;flex-direction:column;border-right:1px solid var(--line);overflow:hidden}
-.chart-hdr{display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:1px solid var(--line);flex-shrink:0}
+.chart-col{display:flex;flex-direction:column;border-right:1px solid var(--line);overflow:hidden;min-height:0;flex:1}
+.chart-hdr{display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:1px solid var(--line);flex-shrink:0;background:var(--bg1)}
 .ch-sym{font-size:13px;font-weight:600;font-family:var(--mono)}
 .ch-price{font-size:13px;font-weight:600;font-family:var(--mono)}
 .ch-chg{font-size:11px;font-family:var(--mono)}
@@ -111,8 +112,8 @@ html,body{background:var(--bg0);color:var(--t1);font-family:var(--sans);font-siz
 .tfs{display:flex;gap:2px;margin-left:auto}
 .tfb{background:none;border:none;color:var(--t2);padding:3px 8px;font-size:10px;cursor:pointer;border-radius:3px;font-family:var(--mono);transition:all .1s}
 .tfb:hover{background:var(--bg3);color:var(--t1)}.tfb.active{background:var(--bg3);color:var(--warn)}
-#chart-wrap{flex:1;position:relative;min-height:0}
-#chart-el{position:absolute;inset:0}
+#chart-wrap{flex:1;position:relative;min-height:0;overflow:hidden}
+#chart-el{position:absolute;inset:0;width:100%;height:100%}
 /* Signal summary bar */
 .sig-bar{border-top:1px solid var(--line);background:var(--bg1);padding:7px 12px;display:flex;align-items:center;gap:12px;flex-shrink:0}
 .sig-dec{min-width:100px}
@@ -341,7 +342,7 @@ html,body{background:var(--bg0);color:var(--t1);font-family:var(--sans);font-siz
   </div>
 
   <!-- OVERVIEW -->
-  <div class="pane active" id="p-overview" style="display:grid">
+  <div class="pane active grid" id="p-overview" style="display:grid">
 
     <div class="chart-col">
       <div class="chart-hdr">
@@ -414,7 +415,7 @@ html,body{background:var(--bg0);color:var(--t1);font-family:var(--sans);font-siz
   <div class="pane" id="p-coins"></div>
 
   <!-- NEWS FULL -->
-  <div class="pane" id="p-news" style="display:grid">
+  <div class="pane grid" id="p-news">
     <div class="news-feed-full">
       <div class="nf-topbar">
         <span class="nf-title">Trading-Relevant Haberler</span>
@@ -433,7 +434,7 @@ html,body{background:var(--bg0);color:var(--t1);font-family:var(--sans);font-siz
   </div>
 
   <!-- ANALYTICS -->
-  <div class="pane" id="p-analytics"></div>
+  <div class="pane grid" id="p-analytics"></div>
 
   <!-- LOG -->
   <div class="pane" id="p-log">
@@ -475,17 +476,16 @@ function toast(msg,type='info'){
 function swTab(n,btn){
   document.querySelectorAll('.tb').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  document.querySelectorAll('.pane').forEach(p=>{p.classList.remove('active');p.style.display='none';});
+  document.querySelectorAll('.pane').forEach(p=>{p.classList.remove('active','grid');p.style.display='none';});
   const pane=document.getElementById('p-'+n);
   if(pane){
+    pane.style.display='';
     pane.classList.add('active');
-    if(n==='overview')pane.style.display='grid';
-    else if(n==='coins'){pane.style.display='grid';renderAllCoinCards();}
-    else if(n==='news')pane.style.display='grid';
-    else if(n==='analytics'){pane.style.display='grid';renderAnalytics();}
-    else pane.style.display='flex';
+    if(['overview','news','analytics'].includes(n))pane.classList.add('grid');
   }
-  if(n==='overview')setTimeout(()=>{if(chart)chart.timeScale().fitContent();},50);
+  if(n==='overview')setTimeout(()=>{if(chart)chart.timeScale().fitContent();},100);
+  if(n==='coins'){renderAllCoinCards();}
+  if(n==='analytics')renderAnalytics();
 }
 
 // Coin selection
@@ -511,26 +511,29 @@ function onAuto(cb){
 // Chart
 async function loadChart(){
   const c=document.getElementById('chart-el');if(!c)return;
+  // Wait for element to have dimensions
+  if(c.offsetWidth===0||c.offsetHeight===0){
+    setTimeout(()=>loadChart(),100);return;
+  }
   try{
     const data=await fetch(`${API}/api/stream/klines/${S.coin}?interval=${S.chartTF}&limit=300`).then(r=>r.json());
     if(!Array.isArray(data)||!data.length)return;
-    if(!chart){
-      chart=LightweightCharts.createChart(c,{
-        layout:{background:{color:'#0b0e11'},textColor:'#848e9c'},
-        grid:{vertLines:{color:'#1e2329'},horzLines:{color:'#1e2329'}},
-        rightPriceScale:{borderColor:'#1e2329'},
-        timeScale:{borderColor:'#1e2329',timeVisible:true,secondsVisible:false},
-        crosshair:{mode:LightweightCharts.CrosshairMode.Normal},
-        width:c.offsetWidth,height:c.offsetHeight,
-      });
-      candleSeries=chart.addCandlestickSeries({
-        upColor:'#0ecb81',downColor:'#f6465d',
-        borderUpColor:'#0ecb81',borderDownColor:'#f6465d',
-        wickUpColor:'#0ecb81',wickDownColor:'#f6465d',
-      });
-      new ResizeObserver(()=>{if(chart&&c)chart.applyOptions({width:c.offsetWidth,height:c.offsetHeight});}).observe(c);
-    }
+    if(chart){chart.remove();chart=null;candleSeries=null;}
+    chart=LightweightCharts.createChart(c,{
+      layout:{background:{color:'#0b0e11'},textColor:'#848e9c'},
+      grid:{vertLines:{color:'#1e2329'},horzLines:{color:'#1e2329'}},
+      rightPriceScale:{borderColor:'#1e2329'},
+      timeScale:{borderColor:'#1e2329',timeVisible:true,secondsVisible:false},
+      crosshair:{mode:LightweightCharts.CrosshairMode.Normal},
+      width:c.offsetWidth,height:c.offsetHeight,
+    });
+    candleSeries=chart.addCandlestickSeries({
+      upColor:'#0ecb81',downColor:'#f6465d',
+      borderUpColor:'#0ecb81',borderDownColor:'#f6465d',
+      wickUpColor:'#0ecb81',wickDownColor:'#f6465d',
+    });
     candleSeries.setData(data);chart.timeScale().fitContent();
+    new ResizeObserver(()=>{if(chart&&c&&c.offsetWidth>0)chart.applyOptions({width:c.offsetWidth,height:c.offsetHeight});}).observe(c);
     const last=data[data.length-1];
     if(last){
       document.getElementById('ch-price').textContent=f(last.close);
@@ -538,23 +541,19 @@ async function loadChart(){
       const p=((last.close-last.open)/last.open*100).toFixed(2);
       const ce=document.getElementById('ch-chg');ce.textContent=(+p>=0?'+':'')+p+'%';ce.className='ch-chg '+(+p>=0?'up':'dn');
     }
-    // Funding
     const fr=await fetch(`${API}/api/market/funding/${S.coin}`).then(r=>r.json()).catch(()=>({}));
     const frv=(parseFloat(fr.funding_rate||0)*100).toFixed(4);
     const fe=document.getElementById('ch-fund');
-    if(fe){fe.innerHTML=`Funding <b style="color:${+frv>0.02?'var(--dn)':+frv<-0.02?'var(--up)':'var(--t1)';font-family:var(--mono)">${frv}%</b>`;}
-    // Signal markers
+    if(fe)fe.innerHTML=`Funding <b style="color:${+frv>0.02?'var(--dn)':+frv<-0.02?'var(--up)':'var(--t1)'};">${frv}%</b>`;
     const sig=coinState[S.coin]?.signal;
     if(sig?.entry&&candleSeries){
-      candleSeries.setMarkers([{
-        time:Math.floor(Date.now()/1000)-1800,
+      candleSeries.setMarkers([{time:Math.floor(Date.now()/1000)-1800,
         position:sig.direction==='LONG'?'belowBar':'aboveBar',
         color:sig.direction==='LONG'?'#0ecb81':'#f6465d',
         shape:sig.direction==='LONG'?'arrowUp':'arrowDown',
-        text:`${sig.direction} ${sig.confidence}/100`,
-      }]);
+        text:`${sig.direction} ${sig.confidence}/100`}]);
     }
-  }catch(e){log('Grafik: '+e.message,'err');}
+  }catch(e){log('Grafik hatası: '+e.message,'err');}
 }
 
 // Signal panel
@@ -1059,8 +1058,10 @@ async function checkHealth(){
 }
 
 // Init
-checkHealth();loadPositions();loadChart();
+checkHealth();loadPositions();
 startDash();startNews();
+// Load chart after layout is rendered
+setTimeout(()=>loadChart(),300);
 setInterval(loadPositions,20000);setInterval(checkHealth,30000);setInterval(()=>loadChart(),60000);
 </script>
 </body>
