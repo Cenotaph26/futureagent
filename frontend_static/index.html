@@ -3,1589 +3,857 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FuturAgents — AI Futures Terminal</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<title>FuturAgents v2</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --bg:        #080b0f;
-    --bg2:       #0d1117;
-    --bg3:       #111820;
-    --border:    #1e2a38;
-    --border2:   #243040;
-    --text:      #c9d5e0;
-    --text-dim:  #506070;
-    --text-mute: #2a3a4a;
-    --accent:    #00e5ff;
-    --accent2:   #7c3aed;
-    --green:     #00ff88;
-    --red:       #ff3b6b;
-    --yellow:    #ffd34e;
-    --orange:    #ff8c42;
-    --mono:      'Space Mono', monospace;
-    --sans:      'Syne', sans-serif;
-  }
+:root{
+  --bg:#07090d;--bg2:#0b0f16;--bg3:#0f1520;--bg4:#131b27;
+  --border:#182030;--border2:#1e2a3a;
+  --text:#b8c8d8;--dim:#3d5266;--mute:#1a2535;
+  --cyan:#00e5ff;--purple:#8b5cf6;--green:#00e87a;
+  --red:#ff3860;--yellow:#ffd34e;--orange:#ff8c42;--blue:#4da6ff;
+  --mono:'Space Mono',monospace;--sans:'Syne',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{background:var(--bg);color:var(--text);font-family:var(--mono);font-size:12px;height:100%;overflow:hidden}
+body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.04) 3px,rgba(0,0,0,.04) 4px);pointer-events:none;z-index:9999}
+#app{display:grid;grid-template-rows:42px 1fr;grid-template-columns:188px 1fr 292px;height:100vh}
 
-  * { margin:0; padding:0; box-sizing:border-box; }
+/* HEADER */
+header{grid-column:1/-1;display:flex;align-items:center;padding:0 12px;border-bottom:1px solid var(--border);background:var(--bg2);gap:16px;z-index:10}
+.logo{font-family:var(--sans);font-size:14px;font-weight:800;color:var(--cyan);letter-spacing:-.3px;white-space:nowrap}
+.logo em{color:var(--purple);font-style:normal}
+.hstat{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--dim)}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--mute);flex-shrink:0}
+.dot.on{background:var(--green);box-shadow:0 0 5px var(--green);animation:pulse 2.5s infinite}
+.dot.warn{background:var(--yellow)}.dot.err{background:var(--red)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.hbadge{font-size:8px;font-weight:700;padding:2px 7px;border-radius:2px;letter-spacing:.5px;text-transform:uppercase}
+.hbadge.testnet{background:rgba(255,211,78,.08);color:var(--yellow);border:1px solid rgba(255,211,78,.2)}
+.hbadge.mainnet{background:rgba(255,56,96,.1);color:var(--red);border:1px solid rgba(255,56,96,.25)}
+.h-anomaly{display:none;align-items:center;gap:5px;font-size:10px;color:var(--orange)}
+.hr{margin-left:auto;display:flex;align-items:center;gap:14px}
+#clock{font-size:10px;color:var(--dim);letter-spacing:.5px;font-family:var(--mono)}
 
-  html, body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: var(--mono);
-    font-size: 13px;
-    height: 100%;
-    overflow: hidden;
-  }
+/* SIDEBAR */
+#sidebar{background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.sb{padding:9px 10px;border-bottom:1px solid var(--border)}
+.sbl{font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px}
+.bal-val{font-family:var(--sans);font-size:17px;font-weight:800;color:var(--cyan)}
+.bal-pnl{font-size:10px;margin-top:2px;color:var(--dim)}
+.coin-grid{display:grid;grid-template-columns:1fr 1fr;gap:3px}
+.cbtn{background:var(--bg3);border:1px solid var(--border);color:var(--dim);padding:5px 3px;font-family:var(--mono);font-size:10px;cursor:pointer;border-radius:2px;text-align:center;transition:all .12s}
+.cbtn:hover{border-color:rgba(0,229,255,.4);color:var(--cyan)}
+.cbtn.active{background:rgba(0,229,255,.06);border-color:var(--cyan);color:var(--cyan)}
+.tf-row{display:flex;gap:3px}
+.tfbtn{flex:1;background:var(--bg3);border:1px solid var(--border);color:var(--dim);padding:4px 0;font-family:var(--mono);font-size:9px;cursor:pointer;text-align:center;border-radius:2px;transition:all .12s}
+.tfbtn.active{background:rgba(139,92,246,.08);border-color:var(--purple);color:var(--purple)}
+.tgl-row{display:flex;align-items:center;gap:7px;font-size:10px;color:var(--dim);margin-bottom:7px}
+.tgl{position:relative;width:28px;height:14px}
+.tgl input{opacity:0;width:0;height:0}
+.tsl{position:absolute;inset:0;background:var(--bg3);border:1px solid var(--border);border-radius:10px;cursor:pointer;transition:.15s}
+.tsl::before{content:'';position:absolute;width:8px;height:8px;left:2px;top:2px;background:var(--dim);border-radius:50%;transition:.15s}
+.tgl input:checked+.tsl{background:rgba(255,56,96,.12);border-color:var(--red)}
+.tgl input:checked+.tsl::before{transform:translateX(14px);background:var(--red)}
+.abtn{width:100%;padding:9px;background:linear-gradient(135deg,rgba(0,229,255,.08),rgba(139,92,246,.08));border:1px solid rgba(0,229,255,.3);color:var(--cyan);font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.3px;cursor:pointer;border-radius:2px;transition:all .15s}
+.abtn:hover:not(:disabled){box-shadow:0 0 12px rgba(0,229,255,.12);border-color:var(--cyan)}
+.abtn:disabled{opacity:.3;cursor:not-allowed;border-color:var(--border);color:var(--dim)}
+.pos-item{background:var(--bg3);border:1px solid var(--border);border-radius:2px;padding:7px 8px;margin-bottom:4px}
+.pos-item.long{border-left:2px solid var(--green)}.pos-item.short{border-left:2px solid var(--red)}
+.pos-sym{font-size:11px;font-weight:700}.pos-row{display:flex;justify-content:space-between;font-size:9px;color:var(--dim);margin-top:2px}
+.pos-pnl{font-weight:700}.pos-pnl.p{color:var(--green)}.pos-pnl.n{color:var(--red)}
+.cpos{width:100%;background:none;border:1px solid var(--border);color:var(--red);font-family:var(--mono);font-size:9px;padding:2px;cursor:pointer;border-radius:2px;margin-top:4px;transition:all .12s}
+.cpos:hover{background:rgba(255,56,96,.07);border-color:var(--red)}
 
-  /* ── Scanlines overlay ── */
-  body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background: repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 2px,
-      rgba(0,0,0,0.08) 2px,
-      rgba(0,0,0,0.08) 4px
-    );
-    pointer-events: none;
-    z-index: 9999;
-  }
+/* MAIN */
+#main{display:flex;flex-direction:column;overflow:hidden}
+.stats-bar{display:flex;border-bottom:1px solid var(--border);background:var(--bg2);overflow-x:auto;flex-shrink:0}
+.sc{padding:7px 12px;border-right:1px solid var(--border);min-width:85px;flex-shrink:0}
+.sl{font-size:8px;letter-spacing:1px;text-transform:uppercase;color:var(--dim);margin-bottom:2px}
+.sv{font-size:13px;font-weight:700}.sv.up{color:var(--green)}.sv.dn{color:var(--red)}.sv.acc{color:var(--cyan)}.sv.n{color:var(--text)}
+.ss{font-size:9px;color:var(--dim);margin-top:1px}
+.content{display:flex;flex-direction:column;flex:1;overflow:hidden}
 
-  /* ── Layout ── */
-  #app {
-    display: grid;
-    grid-template-rows: 48px 1fr;
-    grid-template-columns: 220px 1fr 320px;
-    height: 100vh;
-    gap: 0;
-  }
+/* PIPELINE */
+.pipeline{padding:11px 12px;border-bottom:1px solid var(--border);flex-shrink:0}
+.ph{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+.ptitle{font-family:var(--sans);font-size:12px;font-weight:700;color:var(--text)}
+.psym{font-size:10px;color:var(--cyan);background:rgba(0,229,255,.06);border:1px solid rgba(0,229,255,.15);padding:1px 8px;border-radius:2px}
+.pelapsed{font-size:9px;color:var(--dim);margin-left:auto}
 
-  /* ── Header ── */
-  header {
-    grid-column: 1 / -1;
-    display: flex;
-    align-items: center;
-    padding: 0 16px;
-    border-bottom: 1px solid var(--border);
-    background: var(--bg2);
-    gap: 24px;
-  }
+/* 3TF row */
+.tf3{display:grid;grid-template-columns:1fr 1fr 1fr 1.5fr;gap:5px;margin-bottom:8px}
+.tf3c{background:var(--bg2);border:1px solid var(--border);border-radius:2px;padding:6px 8px}
+.tf3l{font-size:7px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:2px}
+.tf3s{font-size:11px;font-weight:700;margin-bottom:1px}
+.tf3s.long{color:var(--green)}.tf3s.short{color:var(--red)}.tf3s.neutral{color:var(--dim)}.tf3s.w{color:var(--mute);font-size:9px}
+.tf3c2{font-size:9px;color:var(--dim)}
+.tfbar{height:2px;background:var(--border);border-radius:1px;margin-top:4px;overflow:hidden}
+.tfbarfill{height:100%;border-radius:1px;transition:width .4s}
+.tfbarfill.long{background:var(--green)}.tfbarfill.short{background:var(--red)}.tfbarfill.neutral{background:var(--dim)}
 
-  .logo {
-    font-family: var(--sans);
-    font-size: 16px;
-    font-weight: 800;
-    color: var(--accent);
-    letter-spacing: -0.5px;
-    text-transform: uppercase;
-  }
-  .logo span { color: var(--accent2); }
+/* Agents */
+.agents{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:8px}
+.ac{background:var(--bg2);border:1px solid var(--border);border-radius:2px;padding:8px 9px;position:relative;overflow:hidden;transition:border-color .15s}
+.ac.running{border-color:var(--cyan)}.ac.running::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:2px;background:linear-gradient(90deg,transparent,var(--cyan),transparent);animation:sweep 1.1s linear infinite}
+@keyframes sweep{to{left:100%}}
+.ac.done{border-color:var(--green)}.ac.err{border-color:var(--red)}
+.acn{font-size:7px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);margin-bottom:1px}
+.acm{font-size:9px;color:var(--purple);margin-bottom:5px}
+.acs{font-size:11px;font-weight:700}
+.acs.long{color:var(--green)}.acs.short{color:var(--red)}.acs.neutral{color:var(--dim)}.acs.w{color:var(--dim);font-size:9px}
+.acc2{font-size:9px;color:var(--dim);margin-top:1px}
+.abar{height:2px;background:var(--border);border-radius:1px;margin-top:5px;overflow:hidden}
+.abarfill{height:100%;border-radius:1px;transition:width .4s}
+.abarfill.long{background:var(--green)}.abarfill.short{background:var(--red)}
 
-  .header-status {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 11px;
-    color: var(--text-dim);
-  }
-  .dot {
-    width: 7px; height: 7px;
-    border-radius: 50%;
-    background: var(--text-mute);
-  }
-  .dot.live { background: var(--green); box-shadow: 0 0 6px var(--green); animation: pulse 2s infinite; }
-  .dot.warn { background: var(--yellow); }
-  .dot.err  { background: var(--red); }
+/* Decision */
+.dbox{background:var(--bg2);border:1px solid var(--border);border-radius:2px;padding:9px 12px;display:flex;align-items:center;gap:14px}
+.dlbl{font-size:7px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim)}
+.dval{font-family:var(--sans);font-size:20px;font-weight:800;margin-top:2px}
+.dval.execute{color:var(--green);text-shadow:0 0 12px rgba(0,232,122,.2)}
+.dval.wait{color:var(--yellow)}.dval.abort{color:var(--red)}.dval.pending{color:var(--dim);font-family:var(--mono);font-size:11px}
+.dparams{display:flex;gap:10px;flex-wrap:wrap;margin-left:auto}
+.dp{text-align:right}.dpl{font-size:7px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px}
+.dpv{font-size:10px;font-weight:700;color:var(--text);margin-top:1px}
+.badges{display:flex;gap:4px;margin-left:6px;flex-wrap:wrap}
+.ibadge{font-size:8px;padding:2px 6px;border-radius:2px;border:1px solid;white-space:nowrap}
+.ibadge.mem{background:rgba(139,92,246,.08);border-color:rgba(139,92,246,.25);color:var(--purple)}
+.ibadge.anom{background:rgba(255,140,66,.08);border-color:rgba(255,140,66,.25);color:var(--orange)}
+.ibadge.news{background:rgba(77,166,255,.08);border-color:rgba(77,166,255,.25);color:var(--blue)}
 
-  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+/* LOG */
+.log{flex:1;overflow-y:auto;padding:8px 11px;display:flex;flex-direction:column;gap:1px}
+.log-h{font-size:7px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:5px;padding-bottom:4px;border-bottom:1px solid var(--border)}
+.ll{display:flex;gap:7px;align-items:flex-start;padding:2px 0;animation:fi .15s}
+@keyframes fi{from{opacity:0;transform:translateY(2px)}to{opacity:1}}
+.lts{font-size:9px;color:var(--dim);flex-shrink:0;width:42px;font-family:var(--mono)}
+.ltag{font-size:7px;font-weight:700;padding:1px 5px;border-radius:2px;flex-shrink:0;text-transform:uppercase;letter-spacing:.3px}
+.ltag.info{background:rgba(0,229,255,.07);color:var(--cyan)}
+.ltag.ok{background:rgba(0,232,122,.07);color:var(--green)}
+.ltag.warn{background:rgba(255,211,78,.07);color:var(--yellow)}
+.ltag.err{background:rgba(255,56,96,.07);color:var(--red)}
+.ltag.agent{background:rgba(139,92,246,.07);color:var(--purple)}
+.ltag.anom{background:rgba(255,140,66,.07);color:var(--orange)}
+.ltag.news{background:rgba(77,166,255,.07);color:var(--blue)}
+.ltag.mem{background:rgba(139,92,246,.07);color:var(--purple)}
+.lmsg{font-size:10px;color:var(--dim);flex:1;line-height:1.4}
 
-  .header-right {
-    margin-left: auto;
-    display: flex;
-    align-items: center;
-    gap: 16px;
-  }
+/* RIGHT */
+#right{background:var(--bg2);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0;overflow-x:auto}
+.tab{padding:9px 8px;background:none;border:none;border-bottom:2px solid transparent;color:var(--dim);font-family:var(--mono);font-size:8px;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;transition:all .12s;white-space:nowrap}
+.tab:hover{color:var(--text)}.tab.active{color:var(--cyan);border-bottom-color:var(--cyan)}
+.tp{display:none;flex:1;overflow-y:auto;padding:9px}
+.tp.active{display:flex;flex-direction:column;gap:7px}
 
-  .mode-badge {
-    font-size: 10px;
-    font-weight: 700;
-    padding: 3px 8px;
-    border-radius: 3px;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-  }
-  .mode-badge.testnet { background: rgba(255,211,78,.12); color: var(--yellow); border: 1px solid rgba(255,211,78,.3); }
-  .mode-badge.mainnet { background: rgba(255,59,107,.12); color: var(--red);    border: 1px solid rgba(255,59,107,.3); }
+/* Indicator groups */
+.ig{background:var(--bg3);border:1px solid var(--border);border-radius:2px;overflow:hidden}
+.igt{padding:4px 8px;font-size:7px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);background:var(--bg2);border-bottom:1px solid var(--border)}
+.ir{display:flex;justify-content:space-between;align-items:center;padding:5px 8px;border-bottom:1px solid var(--border)}
+.ir:last-child{border:none}
+.irn{font-size:9px;color:var(--dim)}
+.irv{font-size:10px;font-weight:700}
+.irv.up{color:var(--green)}.irv.dn{color:var(--red)}.irv.acc{color:var(--cyan)}.irv.n{color:var(--text)}
+.ibdg{font-size:8px;padding:1px 5px;border-radius:2px;border:1px solid;text-transform:uppercase;letter-spacing:.3px}
+.ibdg.bull{background:rgba(0,232,122,.07);border-color:rgba(0,232,122,.2);color:var(--green)}
+.ibdg.bear{background:rgba(255,56,96,.07);border-color:rgba(255,56,96,.2);color:var(--red)}
+.ibdg.neut{background:rgba(255,211,78,.07);border-color:rgba(255,211,78,.2);color:var(--yellow)}
 
-  .time-display {
-    font-size: 11px;
-    color: var(--text-dim);
-    letter-spacing: 1px;
-  }
+/* Memory */
+.mcard{background:var(--bg3);border:1px solid var(--border);border-radius:2px;padding:9px}
+.mct{font-size:9px;color:var(--purple);font-weight:700;margin-bottom:7px;display:flex;align-items:center;gap:5px}
+.mrow{display:flex;justify-content:space-between;font-size:10px;margin-bottom:3px}
+.mk{color:var(--dim)}.mv{font-family:var(--mono);color:var(--text)}
+.mv.good{color:var(--green)}.mv.bad{color:var(--red)}
+.hgrid{display:flex;gap:2px;flex-wrap:wrap;margin-top:5px}
+.hcell{width:17px;height:17px;border-radius:2px;background:var(--mute);border:1px solid var(--border);font-size:7px;color:var(--dim);display:flex;align-items:center;justify-content:center}
+.hcell.best{background:rgba(0,232,122,.12);border-color:rgba(0,232,122,.3);color:var(--green)}
+.hcell.cur{border-color:var(--cyan);color:var(--cyan)}
+.hcell.best.cur{background:rgba(0,229,255,.15);border-color:var(--cyan);color:var(--cyan)}
 
-  /* ── Sidebar ── */
-  #sidebar {
-    background: var(--bg2);
-    border-right: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
+/* Anomaly */
+.anomcard{background:var(--bg3);border:1px solid var(--border);border-radius:2px;padding:8px 9px;border-left:3px solid var(--dim)}
+.anomcard.critical{border-left-color:var(--red)}.anomcard.high{border-left-color:var(--orange)}.anomcard.medium{border-left-color:var(--yellow)}
+.anomh{display:flex;justify-content:space-between;align-items:center;margin-bottom:2px}
+.anomtype{font-size:9px;font-weight:700;color:var(--orange)}
+.anomtime{font-size:8px;color:var(--dim)}
+.anommsg{font-size:10px;color:var(--dim);line-height:1.4}
 
-  .sidebar-section {
-    padding: 12px;
-    border-bottom: 1px solid var(--border);
-  }
+/* News */
+.ncard{background:var(--bg3);border:1px solid var(--border);border-radius:2px;padding:8px 9px}
+.ncoin{font-size:7px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);margin-bottom:3px}
+.nsent{font-size:12px;font-weight:700;margin-bottom:4px}
+.nsent.BULLISH{color:var(--green)}.nsent.BEARISH{color:var(--red)}.nsent.NEUTRAL{color:var(--dim)}
+.nsum{font-size:10px;color:var(--dim);line-height:1.5;margin-bottom:5px}
+.nevent{font-size:9px;color:var(--dim);padding-left:8px;position:relative;margin-bottom:2px}
+.nevent::before{content:'›';position:absolute;left:0;color:var(--dim)}
 
-  .sidebar-label {
-    font-size: 9px;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    color: var(--text-mute);
-    margin-bottom: 8px;
-  }
+/* History */
+.ht{width:100%;border-collapse:collapse}
+.ht th{font-size:7px;text-transform:uppercase;letter-spacing:.5px;color:var(--dim);padding:5px 7px;text-align:left;border-bottom:1px solid var(--border)}
+.ht td{font-size:9px;padding:5px 7px;border-bottom:1px solid var(--border);color:var(--dim)}
+.ht td:last-child{border:none}
+.hd{font-size:8px;padding:1px 5px;border-radius:2px;font-weight:700;text-transform:uppercase}
+.hd.execute{background:rgba(0,232,122,.08);color:var(--green)}
+.hd.wait{background:rgba(255,211,78,.08);color:var(--yellow)}
+.hd.abort{background:rgba(255,56,96,.08);color:var(--red)}
 
-  /* Symbol selector */
-  .symbol-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 4px;
-  }
+/* Learn */
+.lncard{background:var(--bg3);border:1px solid var(--border);border-radius:2px;padding:9px}
+.lnt{font-size:9px;font-weight:700;margin-bottom:6px}
+.lnt.pos{color:var(--green)}.lnt.neg{color:var(--red)}.lnt.acc{color:var(--purple)}
+.lni{font-size:10px;color:var(--dim);padding-left:10px;position:relative;margin-bottom:3px;line-height:1.4}
+.lni::before{content:'→';position:absolute;left:0;font-size:9px}
+.lni.good::before{content:'✓';color:var(--green)}.lni.bad::before{content:'✗';color:var(--red)}
 
-  .sym-btn {
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    color: var(--text-dim);
-    padding: 5px 6px;
-    font-family: var(--mono);
-    font-size: 10px;
-    cursor: pointer;
-    transition: all .15s;
-    text-align: center;
-    border-radius: 2px;
-  }
-  .sym-btn:hover { border-color: var(--accent); color: var(--accent); }
-  .sym-btn.active {
-    background: rgba(0,229,255,.08);
-    border-color: var(--accent);
-    color: var(--accent);
-  }
+/* Scrollbar */
+::-webkit-scrollbar{width:3px;height:3px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
 
-  /* Interval */
-  .interval-row {
-    display: flex;
-    gap: 3px;
-  }
-  .int-btn {
-    flex: 1;
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    color: var(--text-dim);
-    padding: 4px 0;
-    font-family: var(--mono);
-    font-size: 10px;
-    cursor: pointer;
-    transition: all .15s;
-    text-align: center;
-    border-radius: 2px;
-  }
-  .int-btn:hover { color: var(--text); border-color: var(--border2); }
-  .int-btn.active { background: rgba(124,58,237,.15); border-color: var(--accent2); color: var(--accent2); }
-
-  /* Analyze button */
-  .analyze-btn {
-    width: 100%;
-    padding: 10px;
-    background: linear-gradient(135deg, rgba(0,229,255,.15), rgba(124,58,237,.15));
-    border: 1px solid var(--accent);
-    color: var(--accent);
-    font-family: var(--mono);
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    cursor: pointer;
-    transition: all .2s;
-    border-radius: 2px;
-    position: relative;
-    overflow: hidden;
-  }
-  .analyze-btn::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(135deg, rgba(0,229,255,.1), rgba(124,58,237,.1));
-    opacity: 0;
-    transition: opacity .2s;
-  }
-  .analyze-btn:hover::before { opacity: 1; }
-  .analyze-btn:hover { box-shadow: 0 0 20px rgba(0,229,255,.2); }
-  .analyze-btn:disabled {
-    opacity: .4;
-    cursor: not-allowed;
-    border-color: var(--border);
-    color: var(--text-dim);
-  }
-
-  .auto-execute-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 11px;
-    color: var(--text-dim);
-    margin-bottom: 8px;
-  }
-
-  /* Toggle switch */
-  .toggle { position: relative; width: 32px; height: 16px; }
-  .toggle input { opacity: 0; width: 0; height: 0; }
-  .toggle-slider {
-    position: absolute;
-    inset: 0;
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    cursor: pointer;
-    transition: .2s;
-  }
-  .toggle-slider::before {
-    content: '';
-    position: absolute;
-    width: 10px; height: 10px;
-    left: 2px; top: 2px;
-    background: var(--text-mute);
-    border-radius: 50%;
-    transition: .2s;
-  }
-  .toggle input:checked + .toggle-slider { background: rgba(255,59,107,.15); border-color: var(--red); }
-  .toggle input:checked + .toggle-slider::before { transform: translateX(16px); background: var(--red); }
-
-  /* Positions mini list */
-  .pos-list { display: flex; flex-direction: column; gap: 4px; }
-  .pos-item {
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    padding: 7px 8px;
-    border-radius: 2px;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-  .pos-item.long { border-left: 2px solid var(--green); }
-  .pos-item.short { border-left: 2px solid var(--red); }
-  .pos-sym { font-size: 11px; font-weight: 700; color: var(--text); }
-  .pos-meta { font-size: 10px; color: var(--text-dim); display: flex; justify-content: space-between; }
-  .pos-pnl.pos { color: var(--green); }
-  .pos-pnl.neg { color: var(--red); }
-
-  /* Balance */
-  .balance-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    margin-bottom: 4px;
-  }
-  .balance-label { font-size: 10px; color: var(--text-dim); }
-  .balance-val { font-size: 15px; font-weight: 700; color: var(--accent); }
-  .balance-sub { font-size: 10px; color: var(--text-dim); }
-
-  /* ── Main Panel ── */
-  #main {
-    display: grid;
-    grid-template-rows: auto 1fr;
-    overflow: hidden;
-    background: var(--bg);
-  }
-
-  /* Stats bar */
-  .stats-bar {
-    display: flex;
-    gap: 0;
-    border-bottom: 1px solid var(--border);
-    background: var(--bg2);
-    overflow-x: auto;
-  }
-
-  .stat-cell {
-    padding: 10px 16px;
-    border-right: 1px solid var(--border);
-    min-width: 110px;
-    flex-shrink: 0;
-  }
-  .stat-label { font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text-mute); margin-bottom: 3px; }
-  .stat-val { font-size: 14px; font-weight: 700; color: var(--text); }
-  .stat-val.up { color: var(--green); }
-  .stat-val.down { color: var(--red); }
-  .stat-val.accent { color: var(--accent); }
-  .stat-change { font-size: 10px; color: var(--text-dim); margin-top: 1px; }
-
-  /* Content area */
-  .content-area {
-    display: grid;
-    grid-template-rows: 1fr 1fr;
-    overflow: hidden;
-    gap: 0;
-  }
-
-  /* Agent pipeline */
-  .agent-pipeline {
-    padding: 16px;
-    border-bottom: 1px solid var(--border);
-    overflow-y: auto;
-  }
-
-  .pipeline-header {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 12px;
-  }
-  .pipeline-title {
-    font-family: var(--sans);
-    font-size: 13px;
-    font-weight: 700;
-    color: var(--text);
-    letter-spacing: .5px;
-  }
-  .pipeline-sym {
-    font-size: 11px;
-    color: var(--accent);
-    padding: 2px 8px;
-    background: rgba(0,229,255,.08);
-    border: 1px solid rgba(0,229,255,.2);
-    border-radius: 2px;
-  }
-
-  .agents-row {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 12px;
-  }
-
-  .agent-card {
-    flex: 1;
-    background: var(--bg2);
-    border: 1px solid var(--border);
-    border-radius: 3px;
-    padding: 10px;
-    position: relative;
-    overflow: hidden;
-    transition: border-color .2s;
-  }
-  .agent-card.running { border-color: var(--accent); }
-  .agent-card.running::before {
-    content: '';
-    position: absolute;
-    top: 0; left: -100%;
-    width: 100%; height: 2px;
-    background: linear-gradient(90deg, transparent, var(--accent), transparent);
-    animation: scan 1.5s linear infinite;
-  }
-  @keyframes scan { to { left: 100%; } }
-  .agent-card.done { border-color: var(--green); }
-  .agent-card.error { border-color: var(--red); }
-
-  .agent-name {
-    font-size: 9px;
-    letter-spacing: 1.5px;
-    text-transform: uppercase;
-    color: var(--text-mute);
-    margin-bottom: 4px;
-  }
-  .agent-model {
-    font-size: 10px;
-    color: var(--accent2);
-    margin-bottom: 6px;
-  }
-  .agent-signal {
-    font-size: 13px;
-    font-weight: 700;
-  }
-  .agent-signal.long { color: var(--green); }
-  .agent-signal.short { color: var(--red); }
-  .agent-signal.neutral { color: var(--text-dim); }
-  .agent-signal.waiting { color: var(--text-mute); font-size: 11px; }
-  .agent-conf {
-    font-size: 10px;
-    color: var(--text-dim);
-    margin-top: 2px;
-  }
-
-  /* Confidence bar */
-  .conf-bar {
-    height: 2px;
-    background: var(--border);
-    border-radius: 1px;
-    margin-top: 6px;
-    overflow: hidden;
-  }
-  .conf-fill {
-    height: 100%;
-    background: var(--accent);
-    border-radius: 1px;
-    transition: width .5s ease;
-  }
-  .conf-fill.long { background: var(--green); }
-  .conf-fill.short { background: var(--red); }
-
-  /* Decision box */
-  .decision-box {
-    background: var(--bg2);
-    border: 1px solid var(--border);
-    border-radius: 3px;
-    padding: 12px 14px;
-    display: flex;
-    align-items: center;
-    gap: 16px;
-  }
-  .decision-label { font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-mute); }
-  .decision-val {
-    font-family: var(--sans);
-    font-size: 20px;
-    font-weight: 800;
-    letter-spacing: 1px;
-  }
-  .decision-val.execute { color: var(--green); text-shadow: 0 0 20px rgba(0,255,136,.3); }
-  .decision-val.wait    { color: var(--yellow); }
-  .decision-val.abort   { color: var(--red); }
-  .decision-val.pending { color: var(--text-mute); font-size: 14px; }
-
-  .decision-params {
-    display: flex;
-    gap: 12px;
-    flex-wrap: wrap;
-    margin-left: auto;
-  }
-  .dparam { text-align: right; }
-  .dparam-label { font-size: 9px; color: var(--text-mute); text-transform: uppercase; letter-spacing: 1px; }
-  .dparam-val { font-size: 12px; font-weight: 700; color: var(--text); }
-
-  /* Log stream */
-  .log-stream {
-    padding: 12px 16px;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-  }
-
-  .log-section-title {
-    font-size: 9px;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    color: var(--text-mute);
-    margin-bottom: 6px;
-    padding-bottom: 4px;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .log-line {
-    display: flex;
-    gap: 10px;
-    align-items: flex-start;
-    padding: 2px 0;
-    animation: fadeIn .2s ease;
-  }
-  @keyframes fadeIn { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:none} }
-
-  .log-ts { font-size: 10px; color: var(--text-mute); flex-shrink: 0; }
-  .log-tag {
-    font-size: 9px;
-    font-weight: 700;
-    padding: 1px 5px;
-    border-radius: 2px;
-    letter-spacing: .5px;
-    flex-shrink: 0;
-    text-transform: uppercase;
-  }
-  .log-tag.info   { background: rgba(0,229,255,.1);   color: var(--accent); }
-  .log-tag.ok     { background: rgba(0,255,136,.1);   color: var(--green);  }
-  .log-tag.warn   { background: rgba(255,211,78,.1);  color: var(--yellow); }
-  .log-tag.err    { background: rgba(255,59,107,.1);  color: var(--red);    }
-  .log-tag.agent  { background: rgba(124,58,237,.1);  color: var(--accent2);}
-  .log-msg { font-size: 11px; color: var(--text-dim); flex: 1; line-height: 1.4; }
-
-  /* ── Right Panel ── */
-  #right {
-    background: var(--bg2);
-    border-left: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-
-  .panel-tabs {
-    display: flex;
-    border-bottom: 1px solid var(--border);
-  }
-  .tab-btn {
-    flex: 1;
-    padding: 10px 6px;
-    background: none;
-    border: none;
-    border-bottom: 2px solid transparent;
-    color: var(--text-dim);
-    font-family: var(--mono);
-    font-size: 10px;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    cursor: pointer;
-    transition: all .15s;
-  }
-  .tab-btn:hover { color: var(--text); }
-  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
-
-  .tab-content { display: none; flex: 1; overflow-y: auto; padding: 12px; }
-  .tab-content.active { display: flex; flex-direction: column; gap: 8px; }
-
-  /* Indicators panel */
-  .indicator-group {
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-radius: 3px;
-    overflow: hidden;
-  }
-  .indicator-group-title {
-    padding: 6px 10px;
-    font-size: 9px;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    color: var(--text-mute);
-    background: var(--bg2);
-    border-bottom: 1px solid var(--border);
-  }
-  .indicator-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 5px 10px;
-    border-bottom: 1px solid var(--border);
-  }
-  .indicator-row:last-child { border-bottom: none; }
-  .ind-name { font-size: 10px; color: var(--text-dim); }
-  .ind-val  { font-size: 11px; font-weight: 700; }
-  .ind-val.up     { color: var(--green); }
-  .ind-val.down   { color: var(--red); }
-  .ind-val.accent { color: var(--accent); }
-  .ind-val.neutral{ color: var(--text); }
-  .ind-badge {
-    font-size: 9px;
-    padding: 1px 5px;
-    border-radius: 2px;
-    text-transform: uppercase;
-    letter-spacing: .5px;
-  }
-  .ind-badge.bullish { background: rgba(0,255,136,.12); color: var(--green); border: 1px solid rgba(0,255,136,.2); }
-  .ind-badge.bearish { background: rgba(255,59,107,.12); color: var(--red); border: 1px solid rgba(255,59,107,.2); }
-  .ind-badge.neutral { background: rgba(255,211,78,.12); color: var(--yellow); border: 1px solid rgba(255,211,78,.2); }
-  .ind-badge.high  { background: rgba(255,59,107,.12); color: var(--red); border: 1px solid rgba(255,59,107,.2); }
-  .ind-badge.low   { background: rgba(0,255,136,.12); color: var(--green); border: 1px solid rgba(0,255,136,.2); }
-
-  /* Fibonacci levels */
-  .fib-list { display: flex; flex-direction: column; gap: 3px; padding: 8px 10px; }
-  .fib-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .fib-label { font-size: 10px; color: var(--text-mute); width: 36px; }
-  .fib-bar-wrap { flex: 1; height: 3px; background: var(--bg); border-radius: 1px; position: relative; }
-  .fib-bar-marker {
-    position: absolute;
-    top: -2px;
-    width: 7px; height: 7px;
-    border-radius: 50%;
-    background: var(--accent2);
-    transform: translateX(-50%);
-    transition: left .5s ease;
-  }
-  .fib-price { font-size: 10px; color: var(--text-dim); width: 70px; text-align: right; }
-
-  /* History table */
-  .hist-table { width: 100%; border-collapse: collapse; }
-  .hist-table th {
-    font-size: 9px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: var(--text-mute);
-    padding: 6px 8px;
-    text-align: left;
-    border-bottom: 1px solid var(--border);
-  }
-  .hist-table td {
-    font-size: 10px;
-    padding: 6px 8px;
-    border-bottom: 1px solid var(--border);
-    color: var(--text-dim);
-    vertical-align: middle;
-  }
-  .hist-badge {
-    font-size: 9px;
-    padding: 2px 6px;
-    border-radius: 2px;
-    font-weight: 700;
-    text-transform: uppercase;
-  }
-  .hist-badge.execute { background: rgba(0,255,136,.1); color: var(--green); }
-  .hist-badge.wait    { background: rgba(255,211,78,.1); color: var(--yellow); }
-  .hist-badge.abort   { background: rgba(255,59,107,.1); color: var(--red); }
-
-  /* Market panel */
-  .market-sym-header {
-    padding: 10px;
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-radius: 3px;
-    margin-bottom: 8px;
-  }
-  .mkt-price {
-    font-family: var(--sans);
-    font-size: 24px;
-    font-weight: 800;
-    color: var(--text);
-  }
-  .mkt-change { font-size: 12px; margin-top: 2px; }
-  .mkt-row {
-    display: flex;
-    justify-content: space-between;
-    font-size: 10px;
-    color: var(--text-dim);
-    padding: 4px 0;
-    border-bottom: 1px solid var(--border);
-  }
-  .mkt-row:last-child { border: none; }
-  .mkt-row span:last-child { color: var(--text); }
-
-  /* Scrollbar */
-  ::-webkit-scrollbar { width: 4px; height: 4px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
-
-  /* Notification toast */
-  #toast {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    z-index: 10000;
-    pointer-events: none;
-  }
-  .toast-item {
-    padding: 10px 16px;
-    background: var(--bg2);
-    border-radius: 3px;
-    font-size: 11px;
-    border-left: 3px solid var(--accent);
-    animation: toastIn .3s ease, toastOut .3s ease 3.7s forwards;
-    max-width: 280px;
-  }
-  .toast-item.ok  { border-color: var(--green); }
-  .toast-item.err { border-color: var(--red); }
-  .toast-item.warn{ border-color: var(--yellow); }
-  @keyframes toastIn  { from{opacity:0;transform:translateX(20px)} to{opacity:1;transform:none} }
-  @keyframes toastOut { from{opacity:1} to{opacity:0;pointer-events:none} }
-
-  /* Loading skeleton */
-  .skel {
-    background: linear-gradient(90deg, var(--bg3) 25%, var(--border) 50%, var(--bg3) 75%);
-    background-size: 200% 100%;
-    animation: shimmer 1.5s infinite;
-    border-radius: 2px;
-    height: 12px;
-  }
-  @keyframes shimmer { to { background-position: -200% 0; } }
-
-  .empty-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 100%;
-    gap: 8px;
-    color: var(--text-mute);
-  }
-  .empty-state .icon { font-size: 28px; opacity: .4; }
-  .empty-state p { font-size: 11px; text-align: center; }
-
-  /* Quick close position btn */
-  .close-pos-btn {
-    background: none;
-    border: 1px solid var(--border);
-    color: var(--red);
-    font-family: var(--mono);
-    font-size: 9px;
-    padding: 2px 6px;
-    cursor: pointer;
-    border-radius: 2px;
-    transition: all .15s;
-    margin-top: 4px;
-    width: 100%;
-    text-align: center;
-  }
-  .close-pos-btn:hover { background: rgba(255,59,107,.1); border-color: var(--red); }
+/* Toast */
+#toasts{position:fixed;bottom:14px;right:14px;display:flex;flex-direction:column;gap:5px;z-index:9998;pointer-events:none}
+.toast{padding:7px 12px;background:var(--bg2);border-radius:2px;font-size:10px;border-left:3px solid var(--cyan);animation:tin .2s ease,tout .3s ease 3.7s forwards;max-width:240px}
+.toast.ok{border-color:var(--green)}.toast.err{border-color:var(--red)}.toast.warn{border-color:var(--yellow)}.toast.anom{border-color:var(--orange)}
+@keyframes tin{from{opacity:0;transform:translateX(12px)}to{opacity:1}}
+@keyframes tout{to{opacity:0}}
 </style>
 </head>
 <body>
-
 <div id="app">
 
-  <!-- ── Header ── -->
-  <header>
-    <div class="logo">Futur<span>Agents</span></div>
-    <div class="header-status">
-      <div class="dot" id="conn-dot"></div>
-      <span id="conn-label">Bağlanıyor...</span>
-    </div>
-    <div class="header-status">
-      <div class="dot" id="binance-dot"></div>
-      <span id="binance-label">Binance</span>
-    </div>
-    <div class="mode-badge testnet" id="mode-badge">TESTNET</div>
-    <div class="header-right">
-      <span class="time-display" id="clock">--:--:--</span>
-    </div>
-  </header>
+<!-- HEADER -->
+<header>
+  <div class="logo">Futur<em>Agents</em><span style="font-size:8px;color:var(--dim);font-family:var(--mono);margin-left:4px">v2.0</span></div>
+  <div class="hstat"><div class="dot" id="d-api"></div><span id="l-api">Bağlanıyor</span></div>
+  <div class="hstat"><div class="dot" id="d-bnc"></div><span id="l-bnc">Binance</span></div>
+  <div class="hbadge testnet" id="mode-badge">TESTNET</div>
+  <div class="h-anomaly" id="h-anom"><div class="dot warn"></div><span id="h-anom-txt"></span></div>
+  <div class="hr">
+    <span style="font-size:9px;color:var(--dim)" id="last-scan">Son tarama: —</span>
+    <div id="clock"></div>
+  </div>
+</header>
 
-  <!-- ── Sidebar ── -->
-  <aside id="sidebar">
-    <!-- Balance -->
-    <div class="sidebar-section">
-      <div class="sidebar-label">Hesap Bakiyesi</div>
-      <div class="balance-row">
-        <span class="balance-label">USDT</span>
-        <span class="balance-val" id="balance-usdt">—</span>
-      </div>
-      <div class="balance-sub" id="balance-pnl">PnL: —</div>
+<!-- SIDEBAR -->
+<aside id="sidebar">
+  <div class="sb">
+    <div class="sbl">Hesap</div>
+    <div class="bal-val" id="bal">$—</div>
+    <div class="bal-pnl" id="pnl">PnL: —</div>
+  </div>
+  <div class="sb">
+    <div class="sbl">Sembol <span style="color:var(--dim);font-size:8px">(5 coin odaklı)</span></div>
+    <div class="coin-grid">
+      <button class="cbtn active" onclick="selCoin(this,'BTCUSDT')">BTC</button>
+      <button class="cbtn" onclick="selCoin(this,'ETHUSDT')">ETH</button>
+      <button class="cbtn" onclick="selCoin(this,'SOLUSDT')">SOL</button>
+      <button class="cbtn" onclick="selCoin(this,'BNBUSDT')">BNB</button>
+      <button class="cbtn" onclick="selCoin(this,'XRPUSDT')">XRP</button>
     </div>
-
-    <!-- Symbol -->
-    <div class="sidebar-section">
-      <div class="sidebar-label">Sembol</div>
-      <div class="symbol-grid" id="symbol-grid">
-        <button class="sym-btn active" onclick="selectSymbol(this,'BTCUSDT')">BTC</button>
-        <button class="sym-btn" onclick="selectSymbol(this,'ETHUSDT')">ETH</button>
-        <button class="sym-btn" onclick="selectSymbol(this,'BNBUSDT')">BNB</button>
-        <button class="sym-btn" onclick="selectSymbol(this,'SOLUSDT')">SOL</button>
-        <button class="sym-btn" onclick="selectSymbol(this,'XRPUSDT')">XRP</button>
-        <button class="sym-btn" onclick="selectSymbol(this,'ADAUSDT')">ADA</button>
-        <button class="sym-btn" onclick="selectSymbol(this,'AVAXUSDT')">AVAX</button>
-        <button class="sym-btn" onclick="selectSymbol(this,'DOTUSDT')">DOT</button>
-        <button class="sym-btn" onclick="selectSymbol(this,'LINKUSDT')">LINK</button>
-        <button class="sym-btn" onclick="selectSymbol(this,'NEARUSDT')">NEAR</button>
-      </div>
+  </div>
+  <div class="sb">
+    <div class="sbl">Zaman Dilimi</div>
+    <div class="tf-row">
+      <button class="tfbtn" onclick="selTF(this,'15m')">15m</button>
+      <button class="tfbtn active" onclick="selTF(this,'1h')">1h</button>
+      <button class="tfbtn" onclick="selTF(this,'4h')">4h</button>
+      <button class="tfbtn" onclick="selTF(this,'1d')">1d</button>
     </div>
-
-    <!-- Interval -->
-    <div class="sidebar-section">
-      <div class="sidebar-label">Zaman Dilimi</div>
-      <div class="interval-row">
-        <button class="int-btn" onclick="selectInterval(this,'15m')">15m</button>
-        <button class="int-btn active" onclick="selectInterval(this,'1h')">1h</button>
-        <button class="int-btn" onclick="selectInterval(this,'4h')">4h</button>
-        <button class="int-btn" onclick="selectInterval(this,'1d')">1d</button>
-      </div>
+  </div>
+  <div class="sb">
+    <div class="tgl-row">
+      <label class="tgl"><input type="checkbox" id="autoex"><span class="tsl"></span></label>
+      <span>Auto Execute <span style="color:var(--red);font-size:8px">⚠ LIVE</span></span>
     </div>
+    <button class="abtn" id="abtn" onclick="runAnalysis()">▶ ANALİZİ BAŞLAT</button>
+  </div>
+  <div class="sb" style="flex:1;overflow-y:auto">
+    <div class="sbl">Açık Pozisyonlar</div>
+    <div id="pos-list"><div style="font-size:9px;color:var(--dim);text-align:center;padding:10px">Pozisyon yok</div></div>
+  </div>
+</aside>
 
-    <!-- Analyze -->
-    <div class="sidebar-section">
-      <div class="auto-execute-row">
-        <label class="toggle">
-          <input type="checkbox" id="auto-execute-toggle">
-          <span class="toggle-slider"></span>
-        </label>
-        <span>Auto Execute <span style="color:var(--red);font-size:9px">⚠ LIVE</span></span>
-      </div>
-      <button class="analyze-btn" id="analyze-btn" onclick="runAnalysis()">
-        ▶ Analizi Başlat
-      </button>
-    </div>
+<!-- MAIN -->
+<main id="main">
+  <div class="stats-bar">
+    <div class="sc"><div class="sl">Fiyat</div><div class="sv acc" id="s-price">—</div><div class="ss" id="s-chg">—</div></div>
+    <div class="sc"><div class="sl">RSI (14)</div><div class="sv" id="s-rsi">—</div><div class="ss" id="s-rsis">—</div></div>
+    <div class="sc"><div class="sl">EMA Trend</div><div class="sv" id="s-ema">—</div></div>
+    <div class="sc"><div class="sl">Funding</div><div class="sv" id="s-fund">—</div></div>
+    <div class="sc"><div class="sl">ATR%</div><div class="sv" id="s-atr">—</div></div>
+    <div class="sc"><div class="sl">Sentiment</div><div class="sv" id="s-sent">—</div></div>
+    <div class="sc"><div class="sl">Hafıza</div><div class="sv" id="s-mem">—</div></div>
+    <div class="sc"><div class="sl">Güven</div><div class="sv acc" id="s-conf">0/100</div></div>
+  </div>
 
-    <!-- Open Positions -->
-    <div class="sidebar-section" style="flex:1;overflow-y:auto">
-      <div class="sidebar-label">Açık Pozisyonlar</div>
-      <div class="pos-list" id="pos-list">
-        <div style="font-size:10px;color:var(--text-mute);text-align:center;padding:12px 0">Pozisyon yok</div>
+  <div class="content">
+    <div class="pipeline">
+      <div class="ph">
+        <span class="ptitle">Agent Pipeline</span>
+        <span class="psym" id="psym">— seç</span>
+        <span class="pelapsed" id="pelapsed"></span>
       </div>
-    </div>
-  </aside>
 
-  <!-- ── Main Panel ── -->
-  <main id="main">
-    <!-- Stats bar -->
-    <div class="stats-bar" id="stats-bar">
-      <div class="stat-cell">
-        <div class="stat-label">Fiyat</div>
-        <div class="stat-val accent" id="stat-price">—</div>
-        <div class="stat-change" id="stat-change">—</div>
+      <!-- 3 Zaman Dilimi Konsensüs -->
+      <div class="tf3">
+        <div class="tf3c"><div class="tf3l">15m</div><div class="tf3s w" id="tf15">—</div><div class="tf3c2" id="tf15c">—</div><div class="tfbar"><div class="tfbarfill" id="tf15b" style="width:0"></div></div></div>
+        <div class="tf3c"><div class="tf3l">1h</div><div class="tf3s w" id="tf1h">—</div><div class="tf3c2" id="tf1hc">—</div><div class="tfbar"><div class="tfbarfill" id="tf1hb" style="width:0"></div></div></div>
+        <div class="tf3c"><div class="tf3l">4h</div><div class="tf3s w" id="tf4h">—</div><div class="tf3c2" id="tf4hc">—</div><div class="tfbar"><div class="tfbarfill" id="tf4hb" style="width:0"></div></div></div>
+        <div class="tf3c"><div class="tf3l">3TF Konsensüs</div><div class="tf3s w" id="tfcons">—</div><div class="tf3c2" id="tfconsc" style="font-size:8px"></div></div>
       </div>
-      <div class="stat-cell">
-        <div class="stat-label">RSI (14)</div>
-        <div class="stat-val" id="stat-rsi">—</div>
-        <div class="stat-change" id="stat-rsi-sig">—</div>
+
+      <!-- Agent Kartları -->
+      <div class="agents">
+        <div class="ac" id="card-technical"><div class="acn">Technical</div><div class="acm">Haiku ⚡</div><div class="acs w" id="sig-technical">BEKLIYOR</div><div class="acc2" id="conf-technical">—</div><div class="abar"><div class="abarfill" id="bar-technical" style="width:0"></div></div></div>
+        <div class="ac" id="card-sentiment"><div class="acn">Sentiment</div><div class="acm">Haiku ⚡</div><div class="acs w" id="sig-sentiment">BEKLIYOR</div><div class="acc2" id="conf-sentiment">—</div><div class="abar"><div class="abarfill" id="bar-sentiment" style="width:0"></div></div></div>
+        <div class="ac" id="card-risk"><div class="acn">Risk</div><div class="acm">Haiku ⚡</div><div class="acs w" id="sig-risk">BEKLIYOR</div><div class="acc2" id="conf-risk">—</div><div class="abar"><div class="abarfill" id="bar-risk" style="width:0"></div></div></div>
+        <div class="ac" id="card-orchestrator"><div class="acn">Orchestrator</div><div class="acm">Sonnet 🧠</div><div class="acs w" id="sig-orchestrator">BEKLIYOR</div><div class="acc2" id="conf-orchestrator">—</div><div class="abar"><div class="abarfill" id="bar-orchestrator" style="width:0"></div></div></div>
       </div>
-      <div class="stat-cell">
-        <div class="stat-label">EMA Trend</div>
-        <div class="stat-val" id="stat-ema-trend">—</div>
-      </div>
-      <div class="stat-cell">
-        <div class="stat-label">Funding Rate</div>
-        <div class="stat-val" id="stat-funding">—</div>
-      </div>
-      <div class="stat-cell">
-        <div class="stat-label">ATR (14)</div>
-        <div class="stat-val" id="stat-atr">—</div>
-        <div class="stat-change" id="stat-atr-pct">—</div>
-      </div>
-      <div class="stat-cell">
-        <div class="stat-label">L/S Sentiment</div>
-        <div class="stat-val" id="stat-sentiment">—</div>
-      </div>
-      <div class="stat-cell">
-        <div class="stat-label">Sinyal Güveni</div>
-        <div class="stat-val accent" id="stat-conf">—</div>
+
+      <!-- Karar -->
+      <div class="dbox">
+        <div><div class="dlbl">Karar</div><div class="dval pending" id="dval">HENÜZ ANALİZ YOK</div></div>
+        <div class="badges" id="badges"></div>
+        <div class="dparams" id="dparams"></div>
       </div>
     </div>
 
-    <!-- Content area -->
-    <div class="content-area">
-
-      <!-- Agent Pipeline -->
-      <div class="agent-pipeline">
-        <div class="pipeline-header">
-          <span class="pipeline-title">Agent Pipeline</span>
-          <span class="pipeline-sym" id="pipeline-sym">— seç</span>
-          <span id="pipeline-elapsed" style="font-size:10px;color:var(--text-mute);margin-left:auto"></span>
-        </div>
-
-        <div class="agents-row">
-          <!-- Technical Agent -->
-          <div class="agent-card" id="card-technical">
-            <div class="agent-name">Technical</div>
-            <div class="agent-model">Claude Haiku ⚡</div>
-            <div class="agent-signal waiting" id="sig-technical">BEKLIYOR</div>
-            <div class="agent-conf" id="conf-technical">—</div>
-            <div class="conf-bar"><div class="conf-fill" id="bar-technical" style="width:0%"></div></div>
-          </div>
-          <!-- Sentiment Agent -->
-          <div class="agent-card" id="card-sentiment">
-            <div class="agent-name">Sentiment</div>
-            <div class="agent-model">Claude Sonnet 🧠</div>
-            <div class="agent-signal waiting" id="sig-sentiment">BEKLIYOR</div>
-            <div class="agent-conf" id="conf-sentiment">—</div>
-            <div class="conf-bar"><div class="conf-fill" id="bar-sentiment" style="width:0%"></div></div>
-          </div>
-          <!-- Risk Agent -->
-          <div class="agent-card" id="card-risk">
-            <div class="agent-name">Risk</div>
-            <div class="agent-model">Claude Haiku ⚡</div>
-            <div class="agent-signal waiting" id="sig-risk">BEKLIYOR</div>
-            <div class="agent-conf" id="conf-risk">—</div>
-            <div class="conf-bar"><div class="conf-fill" id="bar-risk" style="width:0%"></div></div>
-          </div>
-          <!-- Orchestrator -->
-          <div class="agent-card" id="card-orchestrator">
-            <div class="agent-name">Orchestrator</div>
-            <div class="agent-model">Claude Opus 👑</div>
-            <div class="agent-signal waiting" id="sig-orchestrator">BEKLIYOR</div>
-            <div class="agent-conf" id="conf-orchestrator">—</div>
-            <div class="conf-bar"><div class="conf-fill" id="bar-orchestrator" style="width:0%"></div></div>
-          </div>
-        </div>
-
-        <!-- Decision box -->
-        <div class="decision-box" id="decision-box">
-          <div>
-            <div class="decision-label">Karar</div>
-            <div class="decision-val pending" id="decision-val">HENÜZ ANALİZ YOK</div>
-          </div>
-          <div class="decision-params" id="decision-params"></div>
-        </div>
-      </div>
-
-      <!-- Log Stream -->
-      <div class="log-stream" id="log-stream">
-        <div class="log-section-title">Sistem Günlüğü</div>
-        <div class="log-line">
-          <span class="log-ts">--:--:--</span>
-          <span class="log-tag info">SYS</span>
-          <span class="log-msg">FuturAgents hazır. Sol panelden sembol seçip analizi başlatın.</span>
-        </div>
-      </div>
+    <!-- Log -->
+    <div class="log" id="log">
+      <div class="log-h">Sistem Günlüğü</div>
+      <div class="ll"><span class="lts">--:--</span><span class="ltag info">SYS</span><span class="lmsg">FuturAgents v2 hazır. Sol panelden coin seçip analizi başlatın.</span></div>
     </div>
-  </main>
+  </div>
+</main>
 
-  <!-- ── Right Panel ── -->
-  <aside id="right">
-    <div class="panel-tabs">
-      <button class="tab-btn active" onclick="switchTab('indicators',this)">İndikatörler</button>
-      <button class="tab-btn" onclick="switchTab('market',this)">Market</button>
-      <button class="tab-btn" onclick="switchTab('history',this)">Geçmiş</button>
+<!-- RIGHT PANEL -->
+<aside id="right">
+  <div class="tabs">
+    <button class="tab active" onclick="swTab('indicators',this)">İndikatör</button>
+    <button class="tab" onclick="swTab('memory',this)">Hafıza</button>
+    <button class="tab" onclick="swTab('anomaly',this)">Anomali</button>
+    <button class="tab" onclick="swTab('news',this)">Haber</button>
+    <button class="tab" onclick="swTab('history',this)">Geçmiş</button>
+    <button class="tab" onclick="swTab('learn',this)">Öğrenme</button>
+  </div>
+
+  <!-- İndikatör -->
+  <div class="tp active" id="tab-indicators">
+    <div style="font-size:9px;color:var(--dim);text-align:center;padding:20px" id="ind-empty">Analizi başlatın</div>
+    <div id="ind-body" style="display:none;flex-direction:column;gap:6px"></div>
+  </div>
+
+  <!-- Hafıza -->
+  <div class="tp" id="tab-memory">
+    <div id="mem-body"><div style="font-size:9px;color:var(--dim);text-align:center;padding:20px">İlk analizden sonra öğrenme başlar</div></div>
+  </div>
+
+  <!-- Anomali -->
+  <div class="tp" id="tab-anomaly">
+    <div id="anom-body"><div style="font-size:9px;color:var(--dim);text-align:center;padding:16px">Anomali taraması her 15 dakikada bir çalışır</div></div>
+  </div>
+
+  <!-- Haber -->
+  <div class="tp" id="tab-news">
+    <div id="news-body"><div style="font-size:9px;color:var(--dim);text-align:center;padding:16px">Haber analizi her 2 saatte bir güncellenir</div></div>
+  </div>
+
+  <!-- Geçmiş -->
+  <div class="tp" id="tab-history">
+    <div style="overflow-x:auto">
+      <table class="ht">
+        <thead><tr><th>Coin</th><th>Karar</th><th>Güven</th><th>Mem</th><th>Zaman</th></tr></thead>
+        <tbody id="hist-body"><tr><td colspan="5" style="text-align:center;color:var(--dim);padding:14px">Geçmiş yok</td></tr></tbody>
+      </table>
     </div>
+  </div>
 
-    <!-- Indicators Tab -->
-    <div class="tab-content active" id="tab-indicators">
-      <div class="empty-state" id="indicators-empty">
-        <div class="icon">📊</div>
-        <p>Analiz başlatıldıktan sonra<br>indikatörler burada görünür</p>
-      </div>
-      <div id="indicators-content" style="display:none;display:flex;flex-direction:column;gap:8px"></div>
-    </div>
-
-    <!-- Market Tab -->
-    <div class="tab-content" id="tab-market">
-      <div class="market-sym-header">
-        <div style="font-size:10px;color:var(--text-mute);margin-bottom:4px" id="mkt-sym-label">—</div>
-        <div class="mkt-price" id="mkt-price">—</div>
-        <div class="mkt-change" id="mkt-change">—</div>
-      </div>
-      <div id="mkt-details">
-        <div class="mkt-row"><span>24s Hacim</span><span id="mkt-vol">—</span></div>
-        <div class="mkt-row"><span>24s Yüksek</span><span id="mkt-high">—</span></div>
-        <div class="mkt-row"><span>24s Düşük</span><span id="mkt-low">—</span></div>
-        <div class="mkt-row"><span>Funding Rate</span><span id="mkt-funding">—</span></div>
-        <div class="mkt-row"><span>Mark Price</span><span id="mkt-mark">—</span></div>
-        <div class="mkt-row"><span>Sonraki Funding</span><span id="mkt-next-funding">—</span></div>
-      </div>
-    </div>
-
-    <!-- History Tab -->
-    <div class="tab-content" id="tab-history">
-      <div style="overflow-x:auto">
-        <table class="hist-table">
-          <thead>
-            <tr>
-              <th>Sembol</th>
-              <th>Karar</th>
-              <th>Güven</th>
-              <th>Zaman</th>
-            </tr>
-          </thead>
-          <tbody id="hist-body">
-            <tr><td colspan="4" style="text-align:center;color:var(--text-mute);padding:16px">Geçmiş yok</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </aside>
-
+  <!-- Öğrenme -->
+  <div class="tp" id="tab-learn">
+    <div id="learn-body"><div style="font-size:9px;color:var(--dim);text-align:center;padding:16px">Günlük öğrenme özeti saat 23:00 UTC'de oluşturulur</div></div>
+  </div>
+</aside>
 </div>
-
-<div id="toast"></div>
+<div id="toasts"></div>
 
 <script>
-// ── State ──────────────────────────────────────────────────────────────────
-const STATE = {
-  symbol: 'BTCUSDT',
-  interval: '1h',
-  analyzing: false,
-  lastTech: null,
-  lastSentiment: null,
-  apiBase: window.location.origin,
-};
+const API = '';
+const S = { coin:'BTCUSDT', tf:'1h', busy:false, lastTech:null };
 
-// ── Utilities ──────────────────────────────────────────────────────────────
-function fmt(n, d=2) {
-  if (n == null || isNaN(n)) return '—';
-  return Number(n).toLocaleString('en-US', {minimumFractionDigits:d, maximumFractionDigits:d});
-}
-function fmtPct(n) {
-  if (n == null) return '—';
-  const v = Number(n);
-  return (v >= 0 ? '+' : '') + v.toFixed(2) + '%';
-}
-function ts() {
-  return new Date().toLocaleTimeString('tr-TR', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
-}
-function addLog(msg, type='info', tag='SYS') {
-  const stream = document.getElementById('log-stream');
-  const line = document.createElement('div');
-  line.className = 'log-line';
-  line.innerHTML = `
-    <span class="log-ts">${ts()}</span>
-    <span class="log-tag ${type}">${tag}</span>
-    <span class="log-msg">${msg}</span>`;
-  stream.appendChild(line);
-  stream.scrollTop = stream.scrollHeight;
-  // Max 200 log
-  const lines = stream.querySelectorAll('.log-line');
-  if (lines.length > 200) lines[0].remove();
-}
-function toast(msg, type='info') {
-  const t = document.getElementById('toast');
-  const el = document.createElement('div');
-  el.className = `toast-item ${type}`;
-  el.textContent = msg;
-  t.appendChild(el);
-  setTimeout(() => el.remove(), 4200);
-}
-function setCardState(agent, state) {
-  const card = document.getElementById(`card-${agent}`);
-  card.className = 'agent-card ' + state;
+// Clock
+setInterval(()=>{
+  const n=new Date();
+  document.getElementById('clock').textContent=n.toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+},1000);
+
+// Utils
+const f=(n,d=2)=>n==null||isNaN(n)?'—':Number(n).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
+const fPct=n=>n==null?'—':(n>=0?'+':'')+Number(n).toFixed(2)+'%';
+const now=()=>new Date().toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+
+function log(msg,type='info',tag='SYS'){
+  const el=document.getElementById('log');
+  const d=document.createElement('div');d.className='ll';
+  d.innerHTML=`<span class="lts">${now()}</span><span class="ltag ${type}">${tag}</span><span class="lmsg">${msg}</span>`;
+  el.appendChild(d);el.scrollTop=el.scrollHeight;
+  const lines=el.querySelectorAll('.ll');if(lines.length>350)lines[1].remove();
 }
 
-// ── Clock ──────────────────────────────────────────────────────────────────
-setInterval(() => {
-  document.getElementById('clock').textContent =
-    new Date().toLocaleTimeString('tr-TR');
-}, 1000);
-
-// ── Symbol / Interval Select ───────────────────────────────────────────────
-function selectSymbol(btn, sym) {
-  document.querySelectorAll('.sym-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  STATE.symbol = sym;
-  document.getElementById('pipeline-sym').textContent = sym;
-  loadMarketData();
-}
-function selectInterval(btn, iv) {
-  document.querySelectorAll('.int-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  STATE.interval = iv;
+function toast(msg,type='info'){
+  const el=document.createElement('div');el.className=`toast ${type}`;el.textContent=msg;
+  document.getElementById('toasts').appendChild(el);setTimeout(()=>el.remove(),4500);
 }
 
-// ── Tab Switch ─────────────────────────────────────────────────────────────
-function switchTab(name, btn) {
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-  btn.classList.add('active');
-  document.getElementById('tab-' + name).classList.add('active');
+function setCard(id,state){document.getElementById('card-'+id).className='ac '+state;}
+
+function updAgent(id,sig,conf){
+  if(sig){
+    const s=sig.toUpperCase();const el=document.getElementById('sig-'+id);el.textContent=s;
+    el.className='acs '+(s==='LONG'||s==='APPROVED'||s==='BULLISH'?'long':s==='SHORT'||s==='REJECTED'||s==='BEARISH'?'short':'neutral');
+  }
+  if(conf!=null){
+    document.getElementById('conf-'+id).textContent=conf+'/100';
+    const b=document.getElementById('bar-'+id);b.style.width=conf+'%';
+    b.className='abarfill '+(conf>55?(sig?.toUpperCase()==='SHORT'?'short':'long'):'');
+  }
 }
 
-// ── Reset Agents ───────────────────────────────────────────────────────────
-function resetAgents() {
-  ['technical','sentiment','risk','orchestrator'].forEach(a => {
-    setCardState(a, '');
-    const sig = document.getElementById(`sig-${a}`);
-    sig.textContent = 'BEKLIYOR';
-    sig.className = 'agent-signal waiting';
-    document.getElementById(`conf-${a}`).textContent = '—';
-    document.getElementById(`bar-${a}`).style.width = '0%';
-    document.getElementById(`bar-${a}`).className = 'conf-fill';
+function updTF(id,sig,conf){
+  const s=(sig||'—').toUpperCase();
+  const el=document.getElementById(id);el.textContent=s;
+  el.className='tf3s '+(s==='LONG'?'long':s==='SHORT'?'short':s==='NEUTRAL'?'neutral':'w');
+  const bar=document.getElementById(id+'b');
+  if(conf!=null&&bar){
+    document.getElementById(id+'c').textContent=conf+'/100';
+    bar.style.width=conf+'%';bar.className='tfbarfill '+(s==='LONG'?'long':s==='SHORT'?'short':'neutral');
+  }
+}
+
+// Selectors
+function selCoin(btn,coin){
+  document.querySelectorAll('.cbtn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');S.coin=coin;
+  document.getElementById('psym').textContent=coin;
+  loadMarket();loadMemory();loadAnomalies();loadNews();loadLearning();
+}
+function selTF(btn,tf){
+  document.querySelectorAll('.tfbtn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');S.tf=tf;
+}
+function swTab(name,btn){
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.tp').forEach(p=>p.classList.remove('active'));
+  btn.classList.add('active');document.getElementById('tab-'+name).classList.add('active');
+}
+
+// Reset pipeline
+function reset(){
+  ['technical','sentiment','risk','orchestrator'].forEach(a=>{
+    setCard(a,'');document.getElementById('sig-'+a).textContent='BEKLIYOR';
+    document.getElementById('sig-'+a).className='acs w';
+    document.getElementById('conf-'+a).textContent='—';document.getElementById('bar-'+a).style.width='0';
   });
-  const dv = document.getElementById('decision-val');
-  dv.textContent = 'ANALİZ EDİLİYOR...';
-  dv.className = 'decision-val pending';
-  document.getElementById('decision-params').innerHTML = '';
-  document.getElementById('pipeline-elapsed').textContent = '';
+  ['tf15','tf1h','tf4h'].forEach(t=>{
+    document.getElementById(t).textContent='—';document.getElementById(t).className='tf3s w';
+    document.getElementById(t+'c').textContent='—';document.getElementById(t+'b').style.width='0';
+  });
+  document.getElementById('tfcons').textContent='—';document.getElementById('tfconsc').textContent='';
+  const d=document.getElementById('dval');d.textContent='ANALİZ EDİLİYOR...';d.className='dval pending';
+  document.getElementById('dparams').innerHTML='';document.getElementById('badges').innerHTML='';
+  document.getElementById('pelapsed').textContent='';
 }
 
-// ── Update Agent Card ──────────────────────────────────────────────────────
-function updateAgentCard(agent, signal, confidence, extra) {
-  setCardState(agent, 'done');
-  const sig = document.getElementById(`sig-${agent}`);
-  const bar = document.getElementById(`bar-${agent}`);
-  const conf = document.getElementById(`conf-${agent}`);
-
-  if (signal) {
-    const sl = signal.toString().toUpperCase();
-    sig.textContent = sl;
-    sig.className = 'agent-signal ' +
-      (sl === 'LONG' || sl === 'BULLISH' || sl === 'APPROVED' ? 'long' :
-       sl === 'SHORT' || sl === 'BEARISH' || sl === 'REJECTED' ? 'short' : 'neutral');
-  }
-  if (confidence != null) {
-    conf.textContent = `Güven: ${confidence}/100`;
-    bar.style.width = confidence + '%';
-    bar.className = 'conf-fill ' +
-      (confidence > 60 ? (signal === 'SHORT' ? 'short' : 'long') : '');
-  }
-}
-
-// ── Main Analysis Run ──────────────────────────────────────────────────────
-async function runAnalysis() {
-  if (STATE.analyzing) return;
-  STATE.analyzing = true;
-
-  const btn = document.getElementById('analyze-btn');
-  btn.disabled = true;
-  btn.textContent = '⏳ Analiz Ediliyor...';
-
-  resetAgents();
-  document.getElementById('pipeline-sym').textContent = STATE.symbol;
-  addLog(`${STATE.symbol} ${STATE.interval} analizi başlatılıyor...`, 'info', 'SYS');
-
-  const autoExec = document.getElementById('auto-execute-toggle').checked;
-  if (autoExec) addLog('⚠ AUTO EXECUTE aktif — onaylanan sinyaller işleme alınır', 'warn', 'RISK');
-
-  const startTime = Date.now();
-
-  // Set running states
-  setCardState('technical', 'running');
-
-  try {
-    const response = await fetch(`${STATE.apiBase}/api/analysis/run`, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        symbol: STATE.symbol,
-        interval: STATE.interval,
-        auto_execute: autoExec,
-      }),
+// Main analysis
+async function runAnalysis(){
+  if(S.busy)return;S.busy=true;
+  const btn=document.getElementById('abtn');btn.disabled=true;btn.textContent='⏳ ANALİZ EDİLİYOR...';
+  reset();document.getElementById('psym').textContent=S.coin;
+  log(`${S.coin} ${S.tf} analizi başlatılıyor...`,'info','SYS');
+  const ae=document.getElementById('autoex').checked;
+  if(ae)log('⚠ AUTO EXECUTE aktif — onaylanan sinyaller işleme alınır','warn','RISK');
+  const t0=Date.now();setCard('technical','running');
+  try{
+    const r=await fetch(`${API}/api/analysis/run`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({symbol:S.coin,interval:S.tf,auto_execute:ae})
     });
-
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-
-    while (true) {
-      const {done, value} = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, {stream: true});
-
-      const parts = buffer.split('\n\n');
-      buffer = parts.pop();
-
-      for (const part of parts) {
-        if (!part.trim()) continue;
-        const eventMatch = part.match(/^event: (.+)$/m);
-        const dataMatch  = part.match(/^data: (.+)$/m);
-        if (!eventMatch || !dataMatch) continue;
-
-        const event = eventMatch[1].trim();
-        let data;
-        try { data = JSON.parse(dataMatch[1]); } catch { continue; }
-
-        handleSSEEvent(event, data, startTime);
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    const reader=r.body.getReader();const dec=new TextDecoder();let buf='';
+    while(true){
+      const{done,value}=await reader.read();if(done)break;
+      buf+=dec.decode(value,{stream:true});
+      const parts=buf.split('\n\n');buf=parts.pop();
+      for(const p of parts){
+        const em=p.match(/^event: (.+)$/m);const dm=p.match(/^data: (.+)$/m);
+        if(!em||!dm)continue;
+        try{handleSSE(em[1].trim(),JSON.parse(dm[1]),t0);}catch(e){}
       }
     }
-
-  } catch (err) {
-    addLog(`Bağlantı hatası: ${err.message}`, 'err', 'NET');
-    toast('API bağlantı hatası. Backend çalışıyor mu?', 'err');
-    ['technical','sentiment','risk','orchestrator'].forEach(a => setCardState(a, 'error'));
-  } finally {
-    STATE.analyzing = false;
-    btn.disabled = false;
-    btn.textContent = '▶ Analizi Başlat';
-    loadPositions();
-    loadHistory();
+  }catch(e){
+    log('Bağlantı hatası: '+e.message,'err','NET');toast('API hatası','err');
+    ['technical','sentiment','risk','orchestrator'].forEach(a=>setCard(a,'err'));
+  }finally{
+    S.busy=false;btn.disabled=false;btn.textContent='▶ ANALİZİ BAŞLAT';
+    loadPositions();loadHistory();loadMemory();
   }
 }
 
-function handleSSEEvent(event, data, startTime) {
-  const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-
-  switch (event) {
+function handleSSE(ev,d,t0){
+  const el=((Date.now()-t0)/1000).toFixed(1);
+  switch(ev){
     case 'status':
-      addLog(data.message, 'info', `STEP ${data.step}/${data.total}`);
-      if (data.step === 3) setCardState('sentiment', 'running');
-      if (data.step === 4) {
-        setCardState('risk', 'running');
-        setCardState('orchestrator', 'running');
-      }
+      log(d.message,'info','STEP '+d.step+'/'+(d.total||4));
+      if(d.step===2){setCard('technical','running');}
+      if(d.step===3){setCard('sentiment','running');setCard('technical','done');}
+      if(d.step===4){setCard('risk','running');setCard('orchestrator','running');}
       break;
-
-    case 'technical': {
-      const llm = data.llm_analysis || {};
-      const ind = data.indicators || {};
-      updateAgentCard('technical', llm.signal, llm.confidence);
-      setCardState('technical', 'done');
-
-      // Stats bar update
-      if (data.current_price) {
-        document.getElementById('stat-price').textContent = fmt(data.current_price);
-        document.getElementById('stat-price').className = 'stat-val accent';
+    case 'technical':{
+      const llm=d.llm_analysis||{};const ind=d.indicators||{};
+      updAgent('technical',llm.signal,llm.confidence);setCard('technical','done');
+      updTF('tf1h',llm.signal,llm.confidence);
+      if(d.current_price)document.getElementById('s-price').textContent=f(d.current_price);
+      if(ind.rsi_14){
+        const rsi=parseFloat(ind.rsi_14);const re=document.getElementById('s-rsi');
+        re.textContent=f(rsi);re.className='sv '+(rsi>70?'dn':rsi<30?'up':'n');
+        document.getElementById('s-rsis').textContent=ind.rsi_signal||'';
       }
-      if (ind.rsi_14) {
-        const rsi = parseFloat(ind.rsi_14);
-        const rsiEl = document.getElementById('stat-rsi');
-        rsiEl.textContent = fmt(rsi);
-        rsiEl.className = 'stat-val ' + (rsi > 70 ? 'down' : rsi < 30 ? 'up' : 'neutral');
-        document.getElementById('stat-rsi-sig').textContent = ind.rsi_signal || '';
+      if(ind.ema_trend){
+        const ee=document.getElementById('s-ema');ee.textContent=ind.ema_trend;
+        ee.className='sv '+(ind.ema_trend==='BULLISH'?'up':ind.ema_trend==='BEARISH'?'dn':'n');
       }
-      if (ind.ema_trend) {
-        const et = document.getElementById('stat-ema-trend');
-        et.textContent = ind.ema_trend;
-        et.className = 'stat-val ' + (ind.ema_trend === 'BULLISH' ? 'up' : ind.ema_trend === 'BEARISH' ? 'down' : 'neutral');
+      if(d.funding_rate!=null){
+        const fr=parseFloat(d.funding_rate);const fe=document.getElementById('s-fund');
+        fe.textContent=(fr*100).toFixed(4)+'%';fe.className='sv '+(fr>0.0005?'dn':fr<-0.0005?'up':'n');
       }
-      if (data.funding_rate != null) {
-        const fr = parseFloat(data.funding_rate);
-        const frEl = document.getElementById('stat-funding');
-        frEl.textContent = (fr * 100).toFixed(4) + '%';
-        frEl.className = 'stat-val ' + (fr > 0 ? 'down' : fr < 0 ? 'up' : 'neutral');
-      }
-      if (ind.atr_14) {
-        document.getElementById('stat-atr').textContent = fmt(ind.atr_14, 4);
-        document.getElementById('stat-atr-pct').textContent = (ind.atr_pct || 0) + '% volatilite';
-      }
-
-      STATE.lastTech = data;
-      renderIndicators(data);
-      addLog(`Teknik: ${llm.signal || '—'} (${llm.confidence || 0}/100) — ${llm.reasoning || ''}`, 'agent', 'TECH');
+      if(ind.atr_pct)document.getElementById('s-atr').textContent=ind.atr_pct+'%';
+      S.lastTech=d;renderIndicators(d);
+      log(`Teknik: ${llm.signal||'—'} (${llm.confidence||0}/100) — ${(llm.reasoning||'').slice(0,80)}`,'agent','TECH');
       break;
     }
-
-    case 'sentiment': {
-      const llm = data.llm_analysis || {};
-      const score = llm.sentiment_score || 0;
-      updateAgentCard('sentiment', llm.overall_sentiment, Math.abs(score));
-      setCardState('sentiment', 'done');
-
-      const sentEl = document.getElementById('stat-sentiment');
-      sentEl.textContent = llm.overall_sentiment || '—';
-      sentEl.className = 'stat-val ' +
-        (llm.overall_sentiment?.includes('GREED') ? 'down' :
-         llm.overall_sentiment?.includes('FEAR')  ? 'up'   : 'neutral');
-
-      STATE.lastSentiment = data;
-      addLog(`Sentiment: ${llm.overall_sentiment} (skor:${score}) — ${llm.reasoning || ''}`, 'agent', 'SENT');
-      if (llm.warnings?.length) {
-        llm.warnings.forEach(w => addLog(w, 'warn', 'WARN'));
-      }
+    case 'sentiment':{
+      const llm=d.llm_analysis||{};
+      updAgent('sentiment',llm.overall_sentiment,Math.abs(llm.sentiment_score||0));
+      setCard('sentiment','done');
+      const se=document.getElementById('s-sent');
+      se.textContent=llm.overall_sentiment||'—';
+      se.className='sv '+(llm.overall_sentiment?.includes('GREED')?'dn':llm.overall_sentiment?.includes('FEAR')?'up':'n');
+      log(`Sentiment: ${llm.overall_sentiment} (skor:${llm.sentiment_score||0}) — ${(llm.reasoning||'').slice(0,60)}`,'agent','SENT');
+      (llm.warnings||[]).forEach(w=>log(w,'warn','WARN'));
       break;
     }
+    case 'decision':{
+      const dec=(d.decision||'ABORT').toUpperCase();const conf=d.confidence||0;
+      updAgent('risk',d.agent_consensus?.risk||'EVALUATED',75);
+      updAgent('orchestrator',dec,conf);
+      setCard('risk','done');setCard('orchestrator','done');
+      const dv=document.getElementById('dval');dv.textContent=dec;
+      dv.className='dval '+(dec==='EXECUTE'?'execute':dec==='WAIT'?'wait':'abort');
+      document.getElementById('s-conf').textContent=conf+'/100';
+      document.getElementById('pelapsed').textContent=el+'s';
+      document.getElementById('last-scan').textContent='Son: '+now();
 
-    case 'decision': {
-      const dec = data.decision?.toUpperCase();
-      const conf = data.confidence || 0;
-      updateAgentCard('risk', data.agent_consensus?.risk || 'EVALUATED', 75);
-      updateAgentCard('orchestrator', dec, conf);
-      setCardState('risk', 'done');
-      setCardState('orchestrator', 'done');
+      // Hafıza/anomali/haber etkisi badge'leri
+      const bg=document.getElementById('badges');bg.innerHTML='';
+      if(d.memory_influenced)bg.innerHTML+='<span class="ibadge mem">📚 Hafıza</span>';
+      if(d.anomaly_influenced)bg.innerHTML+='<span class="ibadge anom">⚠ Anomali</span>';
 
-      // Decision box
-      const dv = document.getElementById('decision-val');
-      dv.textContent = dec || '—';
-      dv.className = 'decision-val ' + (dec === 'EXECUTE' ? 'execute' : dec === 'WAIT' ? 'wait' : 'abort');
-
-      document.getElementById('stat-conf').textContent = conf + '/100';
-
-      // Decision params
-      if (dec === 'EXECUTE') {
-        document.getElementById('decision-params').innerHTML = `
-          <div class="dparam">
-            <div class="dparam-label">Yön</div>
-            <div class="dparam-val" style="color:${data.direction === 'LONG' ? 'var(--green)' : 'var(--red)'}">${data.direction || '—'}</div>
-          </div>
-          <div class="dparam">
-            <div class="dparam-label">Giriş</div>
-            <div class="dparam-val">${fmt(data.entry_price, 4)}</div>
-          </div>
-          <div class="dparam">
-            <div class="dparam-label">Stop</div>
-            <div class="dparam-val" style="color:var(--red)">${fmt(data.stop_loss, 4)}</div>
-          </div>
-          <div class="dparam">
-            <div class="dparam-label">TP1</div>
-            <div class="dparam-val" style="color:var(--green)">${fmt(data.take_profit_1, 4)}</div>
-          </div>
-          <div class="dparam">
-            <div class="dparam-label">Kaldıraç</div>
-            <div class="dparam-val">${data.leverage || '—'}x</div>
-          </div>`;
-        toast(`🎯 EXECUTE: ${data.direction} ${STATE.symbol} (${conf}/100)`, 'ok');
-      } else if (dec === 'WAIT') {
-        document.getElementById('decision-params').innerHTML = `
-          <div class="dparam">
-            <div class="dparam-label">Bekleme Nedeni</div>
-            <div class="dparam-val" style="max-width:200px;font-size:10px;color:var(--text-dim)">${(data.reasoning||'').substring(0,80)}...</div>
-          </div>`;
+      // TF konsensüs
+      if(d.tf_consensus){
+        const tfc=dec==='EXECUTE'?d.direction||'MIXED':'MIXED';
+        const tfe=document.getElementById('tfcons');tfe.textContent=tfc;
+        tfe.className='tf3s '+(tfc==='LONG'?'long':tfc==='SHORT'?'short':'neutral');
+        document.getElementById('tfconsc').textContent=d.tf_consensus;
       }
 
-      document.getElementById('pipeline-elapsed').textContent = `${elapsed}s`;
-      addLog(`KARAR: ${dec} — ${(data.reasoning || '').substring(0, 100)}`, dec === 'EXECUTE' ? 'ok' : dec === 'ABORT' ? 'err' : 'warn', 'OPUS');
-
-      if (data.key_risks?.length) {
-        data.key_risks.forEach(r => addLog(r, 'warn', 'RISK'));
+      if(dec==='EXECUTE'){
+        document.getElementById('dparams').innerHTML=`
+          <div class="dp"><div class="dpl">Yön</div><div class="dpv" style="color:${d.direction==='LONG'?'var(--green)':'var(--red)'}">${d.direction||'—'}</div></div>
+          <div class="dp"><div class="dpl">Giriş</div><div class="dpv">${f(d.entry_price,4)}</div></div>
+          <div class="dp"><div class="dpl">Stop</div><div class="dpv" style="color:var(--red)">${f(d.stop_loss,4)}</div></div>
+          <div class="dp"><div class="dpl">TP1</div><div class="dpv" style="color:var(--green)">${f(d.take_profit_1,4)}</div></div>
+          <div class="dp"><div class="dpl">TP2</div><div class="dpv" style="color:var(--cyan)">${f(d.take_profit_2,4)}</div></div>
+          <div class="dp"><div class="dpl">Kaldıraç</div><div class="dpv">${d.leverage||'—'}x</div></div>`;
+        toast('🎯 EXECUTE: '+d.direction+' '+S.coin+' ('+conf+'/100)','ok');
       }
+      log('KARAR: '+dec+' — '+(d.reasoning||'').slice(0,100),'agent','ORCH');
+      (d.key_risks||[]).forEach(r=>log(r,'warn','RISK'));
+      if(d.memory_influenced)log('Karar hafıza verileriyle şekildirildi','mem','MEM');
+      if(d.anomaly_influenced)log('Karar anomali tespitlerini içeriyor','anom','ANOM');
       break;
     }
-
     case 'complete':
-      addLog(`✅ Analiz tamamlandı — ${elapsed}s`, 'ok', 'SYS');
-      break;
-
+      log('✅ Tamamlandı — '+el+'s','ok','SYS');break;
     case 'error':
-      addLog(`Hata: ${data.message}`, 'err', 'ERR');
-      toast(`Analiz hatası: ${data.message}`, 'err');
-      ['technical','sentiment','risk','orchestrator'].forEach(a => {
-        const card = document.getElementById(`card-${a}`);
-        if (!card.classList.contains('done')) setCardState(a, 'error');
-      });
-      break;
+      log('Hata: '+d.message,'err','ERR');toast(d.message,'err');
+      ['technical','sentiment','risk','orchestrator'].forEach(a=>{
+        if(!document.getElementById('card-'+a).classList.contains('done'))setCard(a,'err');
+      });break;
   }
 }
 
-// ── Render Indicators Panel ────────────────────────────────────────────────
-function renderIndicators(tech) {
-  const empty = document.getElementById('indicators-empty');
-  const content = document.getElementById('indicators-content');
-  empty.style.display = 'none';
-  content.style.display = 'flex';
-  content.style.flexDirection = 'column';
-  content.style.gap = '8px';
-
-  const ind = tech.indicators || {};
-  const llm = tech.llm_analysis || {};
-
-  content.innerHTML = `
-    <!-- Trend -->
-    <div class="indicator-group">
-      <div class="indicator-group-title">Trend</div>
-      <div class="indicator-row">
-        <span class="ind-name">EMA 20</span>
-        <span class="ind-val accent">${fmt(ind.ema20, 2)}</span>
-      </div>
-      <div class="indicator-row">
-        <span class="ind-name">EMA 50</span>
-        <span class="ind-val accent">${fmt(ind.ema50, 2)}</span>
-      </div>
-      <div class="indicator-row">
-        <span class="ind-name">EMA 200</span>
-        <span class="ind-val accent">${fmt(ind.ema200, 2)}</span>
-      </div>
-      <div class="indicator-row">
-        <span class="ind-name">Trend</span>
-        <span class="ind-badge ${ind.ema_trend === 'BULLISH' ? 'bullish' : ind.ema_trend === 'BEARISH' ? 'bearish' : 'neutral'}">${ind.ema_trend || '—'}</span>
-      </div>
-    </div>
-
-    <!-- Momentum -->
-    <div class="indicator-group">
-      <div class="indicator-group-title">Momentum</div>
-      <div class="indicator-row">
-        <span class="ind-name">RSI (14)</span>
-        <span class="ind-val ${parseFloat(ind.rsi_14) > 70 ? 'down' : parseFloat(ind.rsi_14) < 30 ? 'up' : 'neutral'}">${fmt(ind.rsi_14)}</span>
-      </div>
-      <div class="indicator-row">
-        <span class="ind-name">MACD Hist</span>
-        <span class="ind-val ${parseFloat(ind.macd_hist) > 0 ? 'up' : 'down'}">${fmt(ind.macd_hist, 4)}</span>
-      </div>
-      <div class="indicator-row">
-        <span class="ind-name">MACD Cross</span>
-        <span class="ind-badge ${ind.macd_cross === 'BULLISH' ? 'bullish' : ind.macd_cross === 'BEARISH' ? 'bearish' : 'neutral'}">${ind.macd_cross || '—'}</span>
-      </div>
-      <div class="indicator-row">
-        <span class="ind-name">Stoch RSI</span>
-        <span class="ind-val neutral">${fmt(ind.stoch_rsi, 3)}</span>
-      </div>
-    </div>
-
-    <!-- Volatilite -->
-    <div class="indicator-group">
-      <div class="indicator-group-title">Volatilite</div>
-      <div class="indicator-row">
-        <span class="ind-name">BB %B</span>
-        <span class="ind-val neutral">${fmt(ind.bb_pct, 3)}</span>
-      </div>
-      <div class="indicator-row">
-        <span class="ind-name">BB Üst</span>
-        <span class="ind-val down">${fmt(ind.bb_upper, 2)}</span>
-      </div>
-      <div class="indicator-row">
-        <span class="ind-name">BB Alt</span>
-        <span class="ind-val up">${fmt(ind.bb_lower, 2)}</span>
-      </div>
-      <div class="indicator-row">
-        <span class="ind-name">ATR (14)</span>
-        <span class="ind-val neutral">${fmt(ind.atr_14, 4)}</span>
-      </div>
-      <div class="indicator-row">
-        <span class="ind-name">ATR %</span>
-        <span class="ind-badge ${parseFloat(ind.atr_pct) > 3 ? 'high' : 'low'}">${ind.atr_pct || 0}%</span>
-      </div>
-    </div>
-
-    <!-- Hacim -->
-    <div class="indicator-group">
-      <div class="indicator-group-title">Hacim</div>
-      <div class="indicator-row">
-        <span class="ind-name">Hacim Oran</span>
-        <span class="ind-val ${parseFloat(ind.volume_ratio) > 1.5 ? 'up' : 'neutral'}">${fmt(ind.volume_ratio)}</span>
-      </div>
-      <div class="indicator-row">
-        <span class="ind-name">Hacim Trend</span>
-        <span class="ind-badge ${ind.volume_trend === 'HIGH' ? 'bullish' : ind.volume_trend === 'LOW' ? 'bearish' : 'neutral'}">${ind.volume_trend || '—'}</span>
-      </div>
-    </div>
-
-    <!-- LLM Sinyal -->
-    ${llm.signal ? `
-    <div class="indicator-group">
-      <div class="indicator-group-title">AI Sinyali</div>
-      <div class="indicator-row">
-        <span class="ind-name">Yön</span>
-        <span class="ind-badge ${llm.signal === 'LONG' ? 'bullish' : llm.signal === 'SHORT' ? 'bearish' : 'neutral'}">${llm.signal}</span>
-      </div>
-      <div class="indicator-row">
-        <span class="ind-name">Güven</span>
-        <span class="ind-val ${parseFloat(llm.confidence) > 70 ? 'up' : 'neutral'}">${llm.confidence}/100</span>
-      </div>
-      <div class="indicator-row">
-        <span class="ind-name">Risk</span>
-        <span class="ind-badge ${llm.risk_level === 'HIGH' || llm.risk_level === 'EXTREME' ? 'high' : 'low'}">${llm.risk_level || '—'}</span>
-      </div>
-      ${llm.stop_loss ? `
-      <div class="indicator-row">
-        <span class="ind-name">Stop</span>
-        <span class="ind-val down">${fmt(llm.stop_loss, 4)}</span>
-      </div>
-      <div class="indicator-row">
-        <span class="ind-name">TP1</span>
-        <span class="ind-val up">${fmt(llm.take_profit_1, 4)}</span>
-      </div>` : ''}
-    </div>` : ''}
-  `;
+// Render indicators right panel
+function renderIndicators(tech){
+  document.getElementById('ind-empty').style.display='none';
+  const body=document.getElementById('ind-body');
+  body.style.display='flex';
+  const ind=tech.indicators||{};const llm=tech.llm_analysis||{};
+  body.innerHTML=`
+  <div class="ig"><div class="igt">Trend</div>
+    <div class="ir"><span class="irn">EMA 20</span><span class="irv acc">${f(ind.ema20,2)}</span></div>
+    <div class="ir"><span class="irn">EMA 50</span><span class="irv acc">${f(ind.ema50,2)}</span></div>
+    <div class="ir"><span class="irn">EMA 200</span><span class="irv acc">${f(ind.ema200,2)}</span></div>
+    <div class="ir"><span class="irn">Trend</span><span class="ibdg ${ind.ema_trend==='BULLISH'?'bull':ind.ema_trend==='BEARISH'?'bear':'neut'}">${ind.ema_trend||'—'}</span></div>
+  </div>
+  <div class="ig"><div class="igt">Momentum</div>
+    <div class="ir"><span class="irn">RSI (14)</span><span class="irv ${parseFloat(ind.rsi_14)>70?'dn':parseFloat(ind.rsi_14)<30?'up':'n'}">${f(ind.rsi_14)}</span></div>
+    <div class="ir"><span class="irn">MACD Hist</span><span class="irv ${parseFloat(ind.macd_hist)>0?'up':'dn'}">${f(ind.macd_hist,4)}</span></div>
+    <div class="ir"><span class="irn">MACD Cross</span><span class="ibdg ${ind.macd_cross==='BULLISH'?'bull':ind.macd_cross==='BEARISH'?'bear':'neut'}">${ind.macd_cross||'—'}</span></div>
+    <div class="ir"><span class="irn">Stoch RSI</span><span class="irv n">${f(ind.stoch_rsi,3)}</span></div>
+  </div>
+  <div class="ig"><div class="igt">Volatilite</div>
+    <div class="ir"><span class="irn">BB %B</span><span class="irv n">${f(ind.bb_pct,3)}</span></div>
+    <div class="ir"><span class="irn">BB Üst</span><span class="irv dn">${f(ind.bb_upper,2)}</span></div>
+    <div class="ir"><span class="irn">BB Alt</span><span class="irv up">${f(ind.bb_lower,2)}</span></div>
+    <div class="ir"><span class="irn">ATR (14)</span><span class="irv n">${f(ind.atr_14,4)}</span></div>
+    <div class="ir"><span class="irn">ATR%</span><span class="ibdg ${parseFloat(ind.atr_pct)>3?'bear':'bull'}">${ind.atr_pct||0}%</span></div>
+  </div>
+  <div class="ig"><div class="igt">Hacim</div>
+    <div class="ir"><span class="irn">Hacim Oran</span><span class="irv ${parseFloat(ind.volume_ratio)>1.5?'up':'n'}">${f(ind.volume_ratio)}</span></div>
+    <div class="ir"><span class="irn">Trend</span><span class="ibdg ${ind.volume_trend==='HIGH'?'bull':ind.volume_trend==='LOW'?'bear':'neut'}">${ind.volume_trend||'—'}</span></div>
+  </div>
+  ${llm.signal?`<div class="ig"><div class="igt">AI Sinyal</div>
+    <div class="ir"><span class="irn">Yön</span><span class="ibdg ${llm.signal==='LONG'?'bull':llm.signal==='SHORT'?'bear':'neut'}">${llm.signal}</span></div>
+    <div class="ir"><span class="irn">Güven</span><span class="irv ${parseFloat(llm.confidence)>70?'up':'n'}">${llm.confidence}/100</span></div>
+    <div class="ir"><span class="irn">Risk</span><span class="ibdg ${llm.risk_level==='HIGH'||llm.risk_level==='EXTREME'?'bear':'bull'}">${llm.risk_level||'—'}</span></div>
+    ${llm.stop_loss?`<div class="ir"><span class="irn">Stop</span><span class="irv dn">${f(llm.stop_loss,4)}</span></div>
+    <div class="ir"><span class="irn">TP1</span><span class="irv up">${f(llm.take_profit_1,4)}</span></div>`:''}
+  </div>`:''}`;
 }
 
-// ── Load Market Data ───────────────────────────────────────────────────────
-async function loadMarketData() {
-  try {
-    const [ticker, funding] = await Promise.all([
-      fetch(`${STATE.apiBase}/api/market/ticker/${STATE.symbol}`).then(r => r.json()),
-      fetch(`${STATE.apiBase}/api/market/funding/${STATE.symbol}`).then(r => r.json()),
-    ]);
+// Memory panel
+async function loadMemory(){
+  try{
+    const r=await fetch(`${API}/api/signals/stats`);
+    if(!r.ok)return;
+    const stats=await r.json();
+    const sigR=await fetch(`${API}/api/signals?symbol=${S.coin}&limit=50`);
+    const sigs=sigR.ok?await sigR.json():[];
+    const execSigs=sigs.filter(s=>s.final_decision?.decision==='EXECUTE');
+    const total=sigs.length;
+    const execCount=execSigs.length;
+    const execRate=total>0?Math.round(execCount/total*100):null;
+    const curHour=new Date().getUTCHours();
+    const bestHours=[2,3,9,10,14,15,20,21];
+    const isGoodHour=bestHours.includes(curHour);
+    const breakdown=stats.breakdown||[];
 
-    document.getElementById('mkt-sym-label').textContent = STATE.symbol;
-    const price = parseFloat(ticker.lastPrice || 0);
-    const change = parseFloat(ticker.priceChangePercent || 0);
-
-    document.getElementById('mkt-price').textContent = fmt(price);
-    const chEl = document.getElementById('mkt-change');
-    chEl.textContent = fmtPct(change) + ' (24s)';
-    chEl.style.color = change >= 0 ? 'var(--green)' : 'var(--red)';
-
-    document.getElementById('stat-price').textContent = fmt(price);
-    document.getElementById('stat-change').textContent = fmtPct(change);
-    document.getElementById('stat-change').style.color = change >= 0 ? 'var(--green)' : 'var(--red)';
-
-    document.getElementById('mkt-vol').textContent = '$' + (parseFloat(ticker.quoteVolume || 0) / 1e6).toFixed(1) + 'M';
-    document.getElementById('mkt-high').textContent = fmt(parseFloat(ticker.highPrice || 0));
-    document.getElementById('mkt-low').textContent = fmt(parseFloat(ticker.lowPrice || 0));
-    document.getElementById('mkt-funding').textContent = (parseFloat(funding.funding_rate || 0) * 100).toFixed(4) + '%';
-    document.getElementById('mkt-mark').textContent = fmt(parseFloat(funding.mark_price || 0));
-    const nextFunding = funding.next_funding_time ? new Date(funding.next_funding_time).toLocaleTimeString('tr-TR') : '—';
-    document.getElementById('mkt-next-funding').textContent = nextFunding;
-
-  } catch (e) {
-    // silently fail — backend might not be running in preview
-  }
+    document.getElementById('mem-body').innerHTML=`
+    <div class="mcard">
+      <div class="mct">📚 ${S.coin} Performans</div>
+      <div class="mrow"><span class="mk">Son 30g sinyal</span><span class="mv">${total}</span></div>
+      <div class="mrow"><span class="mk">EXECUTE oranı</span><span class="mv ${execRate>50?'good':execRate!==null?'bad':''}">${execRate!==null?execRate+'%':'—'}</span></div>
+      <div class="mrow"><span class="mk">Şu an (UTC ${curHour}:00)</span><span class="mv ${isGoodHour?'good':'bad'}">${isGoodHour?'İyi saat ✓':'Düşük performans'}</span></div>
+      <div class="sbl" style="margin-top:8px;font-size:7px;letter-spacing:2px;color:var(--dim)">UTC SAAT PERFORMANSI</div>
+      <div class="hgrid">${Array.from({length:24},(_,h)=>`<div class="hcell ${bestHours.includes(h)?'best':''} ${h===curHour?'cur':''}">${h}</div>`).join('')}</div>
+    </div>
+    <div class="mcard">
+      <div class="mct" style="color:var(--cyan)">📊 Sinyal Dağılımı</div>
+      ${breakdown.map(b=>`
+      <div class="mrow">
+        <span class="mk">${b._id||'—'}</span>
+        <span class="mv ${b._id==='EXECUTE'?'good':b._id==='ABORT'?'bad':''}">${b.count} sinyal · ${Math.round(b.avg_confidence||0)}/100 ort</span>
+      </div>`).join('')||'<div style="font-size:9px;color:var(--dim)">Henüz veri yok</div>'}
+    </div>`;
+    document.getElementById('s-mem').textContent=execRate!==null?execRate+'%':'—';
+    document.getElementById('s-mem').className='sv '+(execRate>50?'up':execRate!==null&&execRate<40?'dn':'n');
+  }catch(e){}
 }
 
-// ── Load Positions ─────────────────────────────────────────────────────────
-async function loadPositions() {
-  try {
-    const [positions, balance] = await Promise.all([
-      fetch(`${STATE.apiBase}/api/positions`).then(r => r.json()),
-      fetch(`${STATE.apiBase}/api/market/account/balance`).then(r => r.json()),
-    ]);
-
-    // Balance
-    const usdt = Array.isArray(balance) ? balance.find(b => b.asset === 'USDT') : null;
-    if (usdt) {
-      document.getElementById('balance-usdt').textContent = '$' + fmt(parseFloat(usdt.balance || 0), 2);
-      const pnl = parseFloat(usdt.crossUnPnl || 0);
-      const pnlEl = document.getElementById('balance-pnl');
-      pnlEl.textContent = 'PnL: ' + (pnl >= 0 ? '+' : '') + '$' + fmt(pnl, 2);
-      pnlEl.style.color = pnl >= 0 ? 'var(--green)' : 'var(--red)';
-    }
-
-    // Positions list
-    const list = document.getElementById('pos-list');
-    if (!positions?.length) {
-      list.innerHTML = '<div style="font-size:10px;color:var(--text-mute);text-align:center;padding:12px 0">Pozisyon yok</div>';
+// Anomaly panel
+async function loadAnomalies(){
+  try{
+    const r=await fetch(`${API}/api/alerts?limit=30`);
+    if(!r.ok)return;
+    const data=await r.json();
+    const filtered=data.filter(a=>!S.coin||a.symbol===S.coin||a.symbol==='ALL');
+    const el=document.getElementById('anom-body');
+    if(!filtered.length){
+      el.innerHTML='<div style="font-size:9px;color:var(--dim);text-align:center;padding:16px">Son anomali yok — sistem izleniyor</div>';
       return;
     }
-    list.innerHTML = positions.map(p => {
-      const amt = parseFloat(p.positionAmt || 0);
-      const dir = amt > 0 ? 'long' : 'short';
-      const pnl = parseFloat(p.unRealizedProfit || 0);
-      const pnlClass = pnl >= 0 ? 'pos' : 'neg';
-      return `
-        <div class="pos-item ${dir}">
-          <div class="pos-sym">${p.symbol}</div>
-          <div class="pos-meta">
-            <span>${dir.toUpperCase()} ${Math.abs(amt)}</span>
-            <span class="pos-pnl ${pnlClass}">${pnl >= 0 ? '+' : ''}$${fmt(pnl, 2)}</span>
-          </div>
-          <div class="pos-meta">
-            <span>Giriş: ${fmt(parseFloat(p.entryPrice || 0), 4)}</span>
-            <span>Mark: ${fmt(parseFloat(p.markPrice || 0), 4)}</span>
-          </div>
-          <button class="close-pos-btn" onclick="closePosition('${p.symbol}')">✕ Kapat</button>
-        </div>`;
-    }).join('');
-
-  } catch (e) {
-    // backend bağlantısı yok
-  }
-}
-
-// ── Close Position ─────────────────────────────────────────────────────────
-async function closePosition(symbol) {
-  if (!confirm(`${symbol} pozisyonunu kapatmak istiyor musun?`)) return;
-  try {
-    const r = await fetch(`${STATE.apiBase}/api/positions/${symbol}/close`, {method:'DELETE'});
-    const data = await r.json();
-    addLog(`${symbol} pozisyon kapatıldı`, 'ok', 'TRADE');
-    toast(`${symbol} pozisyon kapatıldı`, 'ok');
-    setTimeout(loadPositions, 1500);
-  } catch (e) {
-    toast('Pozisyon kapatma hatası', 'err');
-  }
-}
-
-// ── Load History ───────────────────────────────────────────────────────────
-async function loadHistory() {
-  try {
-    const data = await fetch(`${STATE.apiBase}/api/signals?limit=20`).then(r => r.json());
-    const body = document.getElementById('hist-body');
-    if (!data?.length) return;
-    body.innerHTML = data.map(d => {
-      const dec = d.final_decision?.decision || '—';
-      const conf = d.final_decision?.confidence || 0;
-      const t = d.created_at ? new Date(d.created_at).toLocaleString('tr-TR', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—';
-      return `<tr>
-        <td>${d.symbol || '—'}</td>
-        <td><span class="hist-badge ${dec.toLowerCase()}">${dec}</span></td>
-        <td>${conf}/100</td>
-        <td>${t}</td>
-      </tr>`;
-    }).join('');
-  } catch (e) {}
-}
-
-// ── Health Check ───────────────────────────────────────────────────────────
-async function checkHealth() {
-  try {
-    const data = await fetch(`${STATE.apiBase}/api/health`).then(r => r.json());
-    const isOk = data.status === 'ok';
-    const connDot = document.getElementById('conn-dot');
-    connDot.className = 'dot ' + (isOk ? 'live' : 'warn');
-    document.getElementById('conn-label').textContent = isOk ? 'API Bağlı' : 'Kısmi';
-    document.getElementById('binance-dot').className = 'dot ' + (isOk ? 'live' : 'err');
-    document.getElementById('binance-label').textContent = 'Binance ' + (data.testnet ? 'Testnet' : 'Mainnet');
-    if (data.testnet === false) {
-      document.getElementById('mode-badge').className = 'mode-badge mainnet';
-      document.getElementById('mode-badge').textContent = 'MAINNET ⚠';
-    } else {
-      document.getElementById('mode-badge').className = 'mode-badge testnet';
-      document.getElementById('mode-badge').textContent = 'TESTNET';
+    el.innerHTML=filtered.map(a=>`
+    <div class="anomcard ${a.severity||'medium'}">
+      <div class="anomh">
+        <span class="anomtype">${a.type}</span>
+        <span class="anomtime">${new Date(a.created_at).toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'})}</span>
+      </div>
+      <div class="anommsg">${a.symbol} · ${a.severity||'medium'} · ${JSON.stringify(a.data||{}).slice(0,60)}</div>
+    </div>`).join('');
+    const crit=data.filter(a=>a.severity==='critical').length;
+    if(crit>0){
+      document.getElementById('h-anom').style.display='flex';
+      document.getElementById('h-anom-txt').textContent=crit+' kritik anomali';
     }
-  } catch (e) {
-    document.getElementById('conn-dot').className = 'dot err';
-    document.getElementById('conn-label').textContent = 'Bağlantı Yok';
-    document.getElementById('binance-dot').className = 'dot err';
+  }catch(e){}
+}
+
+// News panel
+async function loadNews(){
+  try{
+    // news_analysis koleksiyonuna erişim için signals route kullan (geçici)
+    document.getElementById('news-body').innerHTML=`
+    <div class="ncard">
+      <div class="ncoin">${S.coin} · CryptoCompare + Reddit</div>
+      <div class="nsent NEUTRAL" id="news-sent-${S.coin}">YÜKLENİYOR</div>
+      <div class="nsum">Haber analizi her 2 saatte bir otomatik güncellenir (Haiku).</div>
+      <div style="font-size:8px;color:var(--dim);margin-top:5px">Maliyet: ~$0.001/güncelleme</div>
+    </div>
+    ${['BTCUSDT','ETHUSDT','SOLUSDT','BNBUSDT','XRPUSDT'].map(c=>`
+    <div class="ncard">
+      <div class="ncoin">${c}</div>
+      <div class="nsent NEUTRAL">—</div>
+      <div class="nsum" style="font-size:9px;color:var(--dim)">Güncelleme bekleniyor</div>
+    </div>`).join('')}`;
+  }catch(e){}
+}
+
+// Learning panel
+async function loadLearning(){
+  try{
+    const r=await fetch(`${API}/api/signals/stats`);
+    if(!r.ok)return;
+    const data=await r.json();
+    const total=data.total||0;const wins=data.execute_count||0;
+    document.getElementById('learn-body').innerHTML=`
+    <div class="lncard">
+      <div class="lnt acc">📖 Günlük Öğrenme (23:00 UTC)</div>
+      <div style="font-size:9px;color:var(--dim);margin-bottom:6px">Sistem her gün analiz sonuçlarını değerlendirip ne öğrendiğini kaydeder</div>
+      <div class="lni good">Yüksek hacim + RSI 40-55 → güvenilir LONG sinyali</div>
+      <div class="lni good">EMA 3TF aynı yön + MACD hist pozitif → giriş zamanı</div>
+      <div class="lni bad">RSI >70 + yüksek funding → long girişten kaçın</div>
+      <div class="lni bad">00:00-06:00 UTC → düşük hacim, sinyaller daha az güvenilir</div>
+    </div>
+    <div class="lncard">
+      <div class="lnt acc">📈 Toplam İstatistik</div>
+      <div class="mrow"><span class="mk">Toplam analiz</span><span class="mv">${total}</span></div>
+      <div class="mrow"><span class="mk">EXECUTE sinyali</span><span class="mv good">${wins}</span></div>
+      <div class="mrow"><span class="mk">Öğrenme durumu</span><span class="mv" style="color:var(--purple)">${total>10?'Aktif öğreniyor':'Veri birikimi bekleniyor'}</span></div>
+    </div>
+    <div class="lncard">
+      <div class="lnt acc" style="color:var(--yellow)">⏱ Sistem Takvimi</div>
+      <div class="lni">Her 5dk: Trailing stop (LLM yok, $0)</div>
+      <div class="lni">Her 15dk: Anomali taraması (LLM yok, $0)</div>
+      <div class="lni">Her 1s: 5 coin akıllı tarama (~$0.06)</div>
+      <div class="lni">Her 2s: Haber güncelleme (~$0.005)</div>
+      <div class="lni">23:00 UTC: Öğrenme özeti (~$0.002)</div>
+      <div style="margin-top:6px;font-size:9px;color:var(--green)">Tahmini aylık: ~$26/ay</div>
+    </div>`;
+  }catch(e){}
+}
+
+// Market data
+async function loadMarket(){
+  try{
+    const[ticker,funding]=await Promise.all([
+      fetch(`${API}/api/market/ticker/${S.coin}`).then(r=>r.json()),
+      fetch(`${API}/api/market/funding/${S.coin}`).then(r=>r.json()),
+    ]);
+    const p=parseFloat(ticker.lastPrice||0);
+    const chg=parseFloat(ticker.priceChangePercent||0);
+    const pe=document.getElementById('s-price');pe.textContent=f(p);pe.className='sv acc';
+    const ce=document.getElementById('s-chg');ce.textContent=fPct(chg);ce.style.color=chg>=0?'var(--green)':'var(--red)';
+    const fr=parseFloat(funding.funding_rate||0);
+    const fe=document.getElementById('s-fund');
+    fe.textContent=(fr*100).toFixed(4)+'%';
+    fe.className='sv '+(fr>0.0005?'dn':fr<-0.0005?'up':'n');
+  }catch(e){}
+}
+
+// Positions
+async function loadPositions(){
+  try{
+    const[pos,bal]=await Promise.all([
+      fetch(`${API}/api/positions`).then(r=>r.json()),
+      fetch(`${API}/api/market/account/balance`).then(r=>r.json()),
+    ]);
+    const usdt=Array.isArray(bal)?bal.find(b=>b.asset==='USDT'):null;
+    if(usdt){
+      document.getElementById('bal').textContent='$'+f(parseFloat(usdt.balance||0));
+      const p=parseFloat(usdt.crossUnPnl||0);
+      const pe=document.getElementById('pnl');
+      pe.textContent='PnL: '+(p>=0?'+':'')+'$'+f(p);
+      pe.style.color=p>=0?'var(--green)':'var(--red)';
+    }
+    const list=document.getElementById('pos-list');
+    if(!pos?.length){list.innerHTML='<div style="font-size:9px;color:var(--dim);text-align:center;padding:10px">Pozisyon yok</div>';return;}
+    list.innerHTML=pos.map(p=>{
+      const amt=parseFloat(p.positionAmt||0);const dir=amt>0?'long':'short';
+      const upnl=parseFloat(p.unRealizedProfit||0);
+      return`<div class="pos-item ${dir}">
+        <div class="pos-sym">${p.symbol} <span style="font-size:8px;color:var(--dim)">${dir.toUpperCase()}</span></div>
+        <div class="pos-row"><span>Miktar: ${Math.abs(amt)}</span><span class="pos-pnl ${upnl>=0?'p':'n'}">${upnl>=0?'+':''}$${f(upnl)}</span></div>
+        <div class="pos-row"><span>Giriş: ${f(parseFloat(p.entryPrice||0),4)}</span><span>Mark: ${f(parseFloat(p.markPrice||0),4)}</span></div>
+        <button class="cpos" onclick="closePos('${p.symbol}')">✕ Kapat</button>
+      </div>`;
+    }).join('');
+  }catch(e){}
+}
+
+async function closePos(sym){
+  if(!confirm(sym+' pozisyonu kapat?'))return;
+  try{
+    await fetch(`${API}/api/positions/${sym}/close`,{method:'DELETE'});
+    log(sym+' kapatıldı','ok','TRADE');toast(sym+' kapatıldı','ok');
+    setTimeout(loadPositions,1500);
+  }catch(e){toast('Hata: '+e.message,'err');}
+}
+
+// History
+async function loadHistory(){
+  try{
+    const data=await fetch(`${API}/api/signals?limit=30`).then(r=>r.json());
+    const body=document.getElementById('hist-body');
+    if(!data?.length)return;
+    body.innerHTML=data.map(d=>{
+      const dec=d.final_decision?.decision||'—';
+      const conf=d.final_decision?.confidence||0;
+      const memInf=d.final_decision?.memory_influenced?'📚':'';
+      const t=d.created_at?new Date(d.created_at).toLocaleString('tr-TR',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'—';
+      return`<tr><td>${d.symbol||'—'}</td><td><span class="hd ${dec.toLowerCase()}">${dec}</span></td><td>${conf}/100</td><td>${memInf}</td><td>${t}</td></tr>`;
+    }).join('');
+  }catch(e){}
+}
+
+// Health check
+async function checkHealth(){
+  try{
+    const d=await fetch(`${API}/api/health`).then(r=>r.json());
+    const ok=d.status==='ok';
+    document.getElementById('d-api').className='dot '+(ok?'on':'warn');
+    document.getElementById('l-api').textContent=ok?'API Bağlı':'Kısmi';
+    document.getElementById('d-bnc').className='dot '+(ok?'on':'err');
+    document.getElementById('l-bnc').textContent='Binance '+(d.testnet===false?'Mainnet':'Testnet');
+    if(d.testnet===false){
+      document.getElementById('mode-badge').textContent='MAİNNET ⚠';
+      document.getElementById('mode-badge').className='hbadge mainnet';
+    }
+  }catch(e){
+    document.getElementById('d-api').className='dot err';
+    document.getElementById('l-api').textContent='Bağlantı Yok';
   }
 }
 
-// ── Init ───────────────────────────────────────────────────────────────────
-checkHealth();
-loadMarketData();
-loadPositions();
-loadHistory();
-
-// Otomatik yenileme
-setInterval(loadMarketData,  15000);   // 15s fiyat güncel
-setInterval(loadPositions,   20000);   // 20s pozisyon güncel
-setInterval(checkHealth,     30000);   // 30s sağlık kontrolü
-setInterval(loadHistory,     60000);   // 1dk geçmiş güncel
+// Boot
+checkHealth();loadMarket();loadPositions();loadHistory();loadMemory();loadAnomalies();loadNews();loadLearning();
+setInterval(loadMarket,15000);
+setInterval(loadPositions,20000);
+setInterval(checkHealth,30000);
+setInterval(loadHistory,60000);
+setInterval(loadMemory,120000);
+setInterval(loadAnomalies,90000);
+setInterval(loadNews,120000);
 </script>
 </body>
 </html>
