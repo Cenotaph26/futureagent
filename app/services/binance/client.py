@@ -207,7 +207,7 @@ class BinanceFuturesClient:
         side: str,           # "BUY" veya "SELL"
         quantity: float,
         reduce_only: bool = False,
-        position_side: str = "BOTH",  # BOTH / LONG / SHORT
+        position_side: str = None,  # None = One-way mode (BOTH), "LONG"/"SHORT" = Hedge mode
     ) -> dict:
         """Market emri aç"""
         params = {
@@ -215,9 +215,11 @@ class BinanceFuturesClient:
             "side": side,
             "type": "MARKET",
             "quantity": self._format_quantity(quantity, symbol),
-            "positionSide": position_side,
         }
-        if reduce_only:
+        # positionSide sadece hedge mode'da gerekli, one-way mode'da hata verir
+        if position_side and position_side != "BOTH":
+            params["positionSide"] = position_side
+        elif reduce_only:
             params["reduceOnly"] = "true"
         return await self._post("/fapi/v1/order", params)
 
@@ -261,7 +263,6 @@ class BinanceFuturesClient:
                 "type": order_type,
                 "quantity": self._format_quantity(quantity, symbol),
                 "stopPrice": f"{stop_price:.4f}",
-                "closePosition": "false",
                 "reduceOnly": "true",
             },
         )
@@ -318,9 +319,20 @@ class BinanceFuturesClient:
         return round(qty, 3)
 
     def _format_quantity(self, qty: float, symbol: str) -> str:
-        """Binance'in gerektirdiği precision'a göre formatla"""
-        # Basit implementasyon; production'da exchange info'dan alınmalı
-        return f"{qty:.3f}"
+        """Coin'e göre precision ayarla"""
+        # Binance testnet minimum step size'ları
+        precision_map = {
+            "BTCUSDT": 3,   # 0.001 BTC
+            "ETHUSDT": 3,   # 0.001 ETH
+            "SOLUSDT": 1,   # 0.1 SOL
+            "BNBUSDT": 2,   # 0.01 BNB
+            "XRPUSDT": 1,   # 1 XRP (integer)
+        }
+        decimals = precision_map.get(symbol, 3)
+        # XRP için tam sayı
+        if symbol == "XRPUSDT":
+            return str(max(1, int(qty)))
+        return f"{qty:.{decimals}f}"
 
     async def close(self):
         if self._client:
