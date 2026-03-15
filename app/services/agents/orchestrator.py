@@ -1,57 +1,64 @@
 """
-FuturAgents — Orchestrator Agent (Baş Agent)
-Claude Opus kullanır — en pahalı ama en akıllı model.
-Tüm sub-agent raporlarını sentezler ve nihai kararı verir:
-  EXECUTE | WAIT | ABORT
+FuturAgents — Mega Orchestrator v2
+$30/ay bütçe · 5 coin · Maksimum zeka
 
-Aynı zamanda mevcut pozisyonları yönetir (stop revize, TP aktif, çıkış).
+Her analiz şunları bilir:
+  1. Teknik analiz (3 zaman dilimi: 15m + 1h + 4h)
+  2. Sentiment analizi (Haiku)
+  3. Risk değerlendirmesi (Haiku)
+  4. Anomali raporu (LLM yok — $0)
+  5. Haber sentimenti (Haiku, 30dk cache)
+  6. Hafıza — geçmişte bu coin/pattern ne performans gösterdi?
+  7. Saat bazlı optimizasyon — şu an iyi saat mi?
+  8. Orchestrator final karar (Sonnet)
 """
 import asyncio
 import logging
 from datetime import datetime
-from typing import Any
 
 from app.core.config import settings
 from app.services.agents.technical_agent import TechnicalAnalysisAgent
 from app.services.agents.sentiment_agent import SentimentAnalysisAgent
 from app.services.agents.risk_agent import RiskManagementAgent
+from app.services.memory.market_memory import MarketMemory
 from app.services.binance.client import get_binance_client
 from app.services.llm.service import get_llm_service
 from app.db.database import get_db
 
 logger = logging.getLogger(__name__)
 
-ORCHESTRATOR_SYSTEM = """Sen FuturAgents'in baş trading ajanısın. Claude Opus modeliyle çalışıyorsun.
+ORCHESTRATOR_SYSTEM = """Sen FuturAgents'in baş trading ajanısın.
 
-Görevin: Teknik analiz, duyarlılık analizi ve risk yönetimi raporlarını sentezleyerek
-KESIN ve ACTIONABLE bir karar vermek.
+Sana verilecek bilgiler:
+- 3 zaman dilimi teknik analiz (15m, 1h, 4h)
+- Piyasa duyarlılığı (funding, L/S, tasfiyeler)
+- Risk değerlendirmesi
+- Anomali raporu (anormal hacim, funding, fiyat hareketleri)
+- Haber sentimenti
+- Geçmiş performans (bu coinде bu pattern kaç kez kazandı?)
+- Şu an iyi saat mi? (geçmişte bu saatte win rate neydi?)
 
 Karar kriterlerin:
-1. ≥2 agent aynı yönde sinyal vermeli
-2. Risk/Ödül oranı minimum 1:2 olmalı
-3. Portfolio riski maksimum %80 exposure
-4. Funding rate aşırı pozitif veya negatifse dikkatli ol
-5. Piyasa volatilitesi EXTREME ise küçük pozisyon veya geç
+1. 3 TF'den en az 2'si aynı yönde → daha güvenilir
+2. Anomali varsa ve yönü destekliyorsa → güven artır
+3. Haberler olumsuzsa → long girmeyi ertele
+4. Geçmişte bu pattern başarısızsa → güveni düşür
+5. Kötü saat ise → bekle
+6. Risk/ödül minimum 1:2 olmalı
 
-EXECUTE kararı verirsen tam parametreleri belirt (entry, stop, TP, quantity, leverage).
-WAIT kararı verirsen ne zaman tekrar değerlendireceğini belirt.
-ABORT kararı verirsen kesin sebebi açıkla.
-
-Yanıtın JSON formatında olmalı."""
+EXECUTE kararında tam parametreler ver.
+Yanıt kesinlikle JSON olmalı."""
 
 
 class OrchestratorAgent:
-    """
-    Multi-agent orkestratörü.
-    Paralel sub-agent analizi → sentez → final karar → (opsiyonel) işlem.
-    """
 
     def __init__(self):
-        self.tech_agent = TechnicalAnalysisAgent()
+        self.tech_agent      = TechnicalAnalysisAgent()
         self.sentiment_agent = SentimentAnalysisAgent()
-        self.risk_agent = RiskManagementAgent()
-        self.binance = get_binance_client()
-        self.llm = get_llm_service()
+        self.risk_agent      = RiskManagementAgent()
+        self.memory          = MarketMemory()
+        self.binance         = get_binance_client()
+        self.llm             = get_llm_service()
 
     async def analyze_and_decide(
         self,
@@ -60,141 +67,151 @@ class OrchestratorAgent:
         auto_execute: bool = False,
         user_id: str = None,
     ) -> dict:
-        """
-        Tam analiz döngüsü:
-        1. Tüm agentları paralel çalıştır
-        2. Orchestrator ile sentez yap
-        3. auto_execute=True ise işlemi gerçekleştir
-        """
-        logger.info(f"[Orchestrator] {symbol} analiz başlıyor (auto_execute={auto_execute})")
-        start_time = datetime.utcnow()
+        logger.info(f"[Orchestrator v2] {symbol} tam analiz başlıyor")
+        start = datetime.utcnow()
 
-        # ── Aşama 1: Paralel Sub-Agent Analizi ───────────────────────
-        tech_task = self.tech_agent.analyze(symbol, interval)
-        sentiment_task = self.sentiment_agent.analyze(symbol)
+        # ── Paralel veri toplama ──────────────────────────────────────────────
+        # 3 zaman dilimi teknik analiz aynı anda
+        tech_15m_task = self.tech_agent.analyze(symbol, "15m", limit=100)
+        tech_1h_task  = self.tech_agent.analyze(symbol, "1h",  limit=200)
+        tech_4h_task  = self.tech_agent.analyze(symbol, "4h",  limit=100)
 
-        tech_result, sentiment_result = await asyncio.gather(
-            tech_task, sentiment_task, return_exceptions=True
+        tech_15m, tech_1h, tech_4h, sentiment, memory_data = await asyncio.gather(
+            tech_15m_task, tech_1h_task, tech_4h_task,
+            self.sentiment_agent.analyze(symbol),
+            self.memory.get_coin_intelligence(symbol),
+            return_exceptions=True,
         )
 
-        # Hata kontrolü
-        if isinstance(tech_result, Exception):
-            logger.error(f"Teknik analiz hatası: {tech_result}")
-            tech_result = {"error": str(tech_result), "llm_analysis": {"signal": "NEUTRAL", "confidence": 0}}
-        if isinstance(sentiment_result, Exception):
-            logger.error(f"Duyarlılık hatası: {sentiment_result}")
-            sentiment_result = {"error": str(sentiment_result), "llm_analysis": {"overall_sentiment": "NEUTRAL"}}
+        # Hata toleransı
+        for name, val in [("tech_15m", tech_15m), ("tech_1h", tech_1h),
+                          ("tech_4h", tech_4h), ("sentiment", sentiment)]:
+            if isinstance(val, Exception):
+                logger.warning(f"{name} hatası: {val}")
 
-        # ── Aşama 2: İlk Sinyal Değerlendirmesi ──────────────────────
-        tech_signal = tech_result.get("llm_analysis", {}).get("signal", "NEUTRAL")
-        tech_confidence = tech_result.get("llm_analysis", {}).get("confidence", 0)
-        current_price = tech_result.get("current_price", 0)
-        atr = tech_result.get("indicators", {}).get("atr_14", 0)
+        tech_1h = tech_1h if not isinstance(tech_1h, Exception) else {"llm_analysis": {"signal": "NEUTRAL", "confidence": 0}, "indicators": {}, "current_price": 0}
+        tech_15m = tech_15m if not isinstance(tech_15m, Exception) else {"llm_analysis": {"signal": "NEUTRAL", "confidence": 0}}
+        tech_4h  = tech_4h  if not isinstance(tech_4h,  Exception) else {"llm_analysis": {"signal": "NEUTRAL", "confidence": 0}}
+        sentiment = sentiment if not isinstance(sentiment, Exception) else {"llm_analysis": {"overall_sentiment": "NEUTRAL"}}
+        if isinstance(memory_data, Exception):
+            memory_data = {}
 
-        # Sinyal varsa risk değerlendirmesi yap
-        risk_result = None
-        if tech_signal in ("LONG", "SHORT") and tech_confidence >= 50:
-            risk_result = await self.risk_agent.evaluate(
-                symbol=symbol,
-                signal=tech_signal,
-                entry_price=current_price,
-                technical_atr=atr,
-                technical_confidence=tech_confidence,
-                user_id=user_id,
+        # Hafızadan pattern skoru
+        indicators = tech_1h.get("indicators", {})
+        pattern_score = await self.memory.get_pattern_score(symbol, indicators)
+
+        # Mevcut fiyat ve risk
+        current_price = tech_1h.get("current_price", 0)
+        atr = indicators.get("atr_14", 0)
+        tech_signal = tech_1h.get("llm_analysis", {}).get("signal", "NEUTRAL")
+        tech_conf   = tech_1h.get("llm_analysis", {}).get("confidence", 0)
+
+        risk = None
+        if tech_signal in ("LONG", "SHORT") and tech_conf >= 45 and current_price > 0 and atr > 0:
+            risk = await self.risk_agent.evaluate(
+                symbol=symbol, signal=tech_signal,
+                entry_price=current_price, technical_atr=atr,
+                technical_confidence=tech_conf,
             )
-        
-        if isinstance(risk_result, Exception):
-            risk_result = None
+            if isinstance(risk, Exception):
+                risk = None
 
-        # ── Aşama 3: Orchestrator Sentezi ────────────────────────────
-        final_decision = await self._synthesize(
+        # Anomali raporu (DB'den — detector ayrı çalışıyor)
+        from datetime import timedelta
+        anomalies = await get_db().anomalies.find(
+            {"symbol": symbol, "created_at": {"$gte": datetime.utcnow() - timedelta(hours=4)}}
+        ).sort("created_at", -1).limit(5).to_list(5)
+
+        # ── Orchestrator sentezi ──────────────────────────────────────────────
+        final = await self._synthesize(
             symbol=symbol,
-            tech=tech_result,
-            sentiment=sentiment_result,
-            risk=risk_result,
+            tech_15m=tech_15m, tech_1h=tech_1h, tech_4h=tech_4h,
+            sentiment=sentiment, risk=risk,
+            anomalies=anomalies, memory=memory_data, pattern_score=pattern_score,
         )
 
-        # ── Aşama 4: Opsiyonel İşlem Gerçekleştirme ──────────────────
-        execution_result = None
-        if auto_execute and final_decision.get("decision") == "EXECUTE":
-            execution_result = await self._execute_trade(symbol, final_decision, risk_result)
+        # ── Opsiyonel işlem ───────────────────────────────────────────────────
+        execution = None
+        if auto_execute and final.get("decision") == "EXECUTE":
+            execution = await self._execute_trade(symbol, final, risk)
 
-        # ── Sonucu DB'ye kaydet ───────────────────────────────────────
-        elapsed = (datetime.utcnow() - start_time).total_seconds()
+        elapsed = (datetime.utcnow() - start).total_seconds()
         report = {
-            "symbol": symbol,
-            "interval": interval,
-            "user_id": user_id,
-            "technical": tech_result,
-            "sentiment": sentiment_result,
-            "risk": risk_result,
-            "final_decision": final_decision,
-            "execution": execution_result,
-            "auto_executed": auto_execute and execution_result is not None,
+            "symbol": symbol, "interval": interval, "user_id": user_id,
+            "technical_15m": tech_15m, "technical_1h": tech_1h, "technical_4h": tech_4h,
+            "sentiment": sentiment, "risk": risk,
+            "anomalies": [{"type": a["type"], "severity": a.get("severity")} for a in anomalies],
+            "memory": memory_data, "pattern_score": pattern_score,
+            "final_decision": final,
+            "execution": execution,
+            "auto_executed": auto_execute and execution is not None,
             "elapsed_seconds": round(elapsed, 1),
             "created_at": datetime.utcnow(),
         }
-
         await self._save_analysis(report)
-
-        logger.info(
-            f"[Orchestrator] {symbol} tamamlandı: {final_decision.get('decision')} "
-            f"({elapsed:.1f}s)"
-        )
+        logger.info(f"[Orchestrator v2] {symbol}: {final.get('decision')} ({elapsed:.1f}s)")
         return report
 
-    async def _synthesize(
-        self,
-        symbol: str,
-        tech: dict,
-        sentiment: dict,
-        risk: dict | None,
-    ) -> dict:
-        """Claude Opus ile nihai karar"""
+    async def _synthesize(self, symbol, tech_15m, tech_1h, tech_4h,
+                           sentiment, risk, anomalies, memory, pattern_score) -> dict:
 
-        tech_llm = tech.get("llm_analysis", {})
-        sent_llm = sentiment.get("llm_analysis", {})
-        risk_llm = risk.get("llm_assessment", {}) if risk else {}
+        t15 = tech_15m.get("llm_analysis", {})
+        t1h = tech_1h.get("llm_analysis", {})
+        t4h = tech_4h.get("llm_analysis", {})
+        sent = sentiment.get("llm_analysis", {})
+        ind  = tech_1h.get("indicators", {})
+
+        # TF konsensüs sayımı
+        signals = [s.get("signal", "NEUTRAL") for s in [t15, t1h, t4h]]
+        long_count  = signals.count("LONG")
+        short_count = signals.count("SHORT")
+        tf_consensus = f"{long_count}/3 LONG, {short_count}/3 SHORT"
+
+        anom_text = "\n".join([f"  - {a['type']} ({a.get('severity', '?')} şiddet)" for a in anomalies]) or "  Yok"
 
         user_prompt = f"""
-=== {symbol} TAM ANALİZ RAPORU ===
+=== {symbol} TAM ANALİZ ===
 
-[TEKNİK ANALİZ - {tech.get('interval', '1h')}]
-Sinyal: {tech_llm.get('signal', 'NEUTRAL')} (Güven: {tech_llm.get('confidence', 0)}/100)
-Gerekçe: {tech_llm.get('reasoning', 'N/A')}
-Entry Zone: {tech_llm.get('entry_zone', {})}
-Stop-Loss: {tech_llm.get('stop_loss', 'N/A')}
-TP1: {tech_llm.get('take_profit_1', 'N/A')}
-TP2: {tech_llm.get('take_profit_2', 'N/A')}
-Risk Seviyesi: {tech_llm.get('risk_level', 'UNKNOWN')}
-Temel İndikatörler:
-  - RSI: {tech.get('indicators', {}).get('rsi_14', 'N/A')}
-  - EMA Trend: {tech.get('indicators', {}).get('ema_trend', 'N/A')}
-  - MACD Cross: {tech.get('indicators', {}).get('macd_cross', 'N/A')}
-  - Funding Rate: {tech.get('funding_rate', 0):.4%}
+[3 ZAMAN DİLİMİ KONSENSÜSü: {tf_consensus}]
+15m: {t15.get('signal','?')} ({t15.get('confidence',0)}/100)
+1h:  {t1h.get('signal','?')} ({t1h.get('confidence',0)}/100) | Gerekçe: {t1h.get('reasoning','')[:80]}
+4h:  {t4h.get('signal','?')} ({t4h.get('confidence',0)}/100)
 
-[DUYARLILIK ANALİZİ]
-Genel Duyarlılık: {sent_llm.get('overall_sentiment', 'NEUTRAL')}
-Skor: {sent_llm.get('sentiment_score', 0)}/100
-Squeeze Riski: {sent_llm.get('squeeze_risk', {})}
-Kontrarian Sinyal: {sent_llm.get('contrarian_signal', 'HOLD')}
-Gerekçe: {sent_llm.get('reasoning', 'N/A')}
-Uyarılar: {sent_llm.get('warnings', [])}
+[TEKNİK İNDİKATÖRLER (1h)]
+RSI: {ind.get('rsi_14','?')} ({ind.get('rsi_signal','?')})
+EMA Trend: {ind.get('ema_trend','?')}
+MACD Cross: {ind.get('macd_cross','?')}
+BB %B: {ind.get('bb_pct','?')}
+Funding: {tech_1h.get('funding_rate',0):.4%}
+ATR: {ind.get('atr_pct','?')}%
 
-[RİSK YÖNETİMİ]
-{"Onaylı: " + str(risk_llm.get('approved', False)) if risk else "Risk değerlendirmesi yapılmadı (sinyal yok)"}
-{f"Risk Skoru: {risk_llm.get('risk_score', 'N/A')}/100" if risk else ""}
-{f"Miktar: {risk.get('sizing', {}).get('quantity', 'N/A')}" if risk else ""}
-{f"Kaldıraç: {risk.get('sizing', {}).get('leverage', 'N/A')}x" if risk else ""}
-{f"Stop-Loss: {risk.get('levels', {}).get('stop_loss', 'N/A')}" if risk else ""}
-{f"TP1: {risk.get('levels', {}).get('take_profit_1', 'N/A')}" if risk else ""}
-{f"Risk Uyarıları: {risk_llm.get('warnings', [])}" if risk else ""}
+[DUYARLILIK]
+Genel: {sent.get('overall_sentiment','?')} (skor: {sent.get('sentiment_score',0)})
+Squeeze riski: {sent.get('squeeze_risk',{})}
+Gerekçe: {sent.get('reasoning','')[:80]}
 
-Tüm bu bilgileri sentezleyerek KESIN kararını ver:
+[ANOMALİLER (son 4 saat)]
+{anom_text}
+
+[HAFIZA — Bu coin geçmişte nasıl performans gösterdi?]
+Son 30 gün sinyal sayısı: {memory.get('total_signals_30d', 'Veri yok')}
+Son 30 gün win rate: {memory.get('win_rate_30d', 'Veri yok')}%
+Ortalama PnL: {memory.get('avg_pnl_30d', 'Veri yok')}%
+Bu pattern skoru: {pattern_score} (0=kötü, 1=iyi)
+İyi saatler (UTC): {memory.get('best_hours_utc', [])}
+Şu an iyi saat mi: {memory.get('is_good_hour', '?')}
+Son anomaliler: {memory.get('recent_anomalies', [])}
+Haber sentimenti: {memory.get('news_sentiment', '?')}
+Haber özeti: {memory.get('news_key_events', [])}
+
+[RİSK DEĞERLENDİRMESİ]
+{f"Onaylandı: {risk.get('llm_assessment',{}).get('approved','?')}, Miktar: {risk.get('sizing',{}).get('quantity','?')}, Kaldıraç: {risk.get('sizing',{}).get('leverage','?')}x" if risk else "Risk değerlendirmesi yapılmadı"}
+
+Tüm bu bilgileri sentezle. Hafıza ve anomali verileri kararında önemli rol oynasın.
 
 {{
-  "decision": "EXECUTE" | "WAIT" | "ABORT",
-  "direction": "LONG" | "SHORT" | null,
+  "decision": "EXECUTE"|"WAIT"|"ABORT",
+  "direction": "LONG"|"SHORT"|null,
   "entry_price": sayı,
   "quantity": sayı,
   "leverage": sayı,
@@ -202,83 +219,60 @@ Tüm bu bilgileri sentezleyerek KESIN kararını ver:
   "take_profit_1": sayı,
   "take_profit_2": sayı,
   "confidence": 0-100,
-  "reasoning": "kapsamlı gerekçe",
-  "key_risks": ["risk listesi"],
-  "wait_until": "eğer WAIT ise ne zaman tekrar bak",
-  "agent_consensus": {{"technical": "LONG/SHORT/NEUTRAL", "sentiment": "BULLISH/BEARISH/NEUTRAL", "risk": "APPROVED/REJECTED/NA"}}
-}}
-"""
+  "tf_consensus": "{tf_consensus}",
+  "reasoning": "kapsamlı gerekçe (hafıza ve anomali dahil)",
+  "key_risks": [],
+  "memory_influenced": true|false,
+  "anomaly_influenced": true|false,
+  "wait_until": "eğer WAIT ise"
+}}"""
+
         try:
             return await self.llm.complete_json(
                 system=ORCHESTRATOR_SYSTEM,
                 user=user_prompt,
-                model_tier="orchestrator",  # Claude Opus
-                max_tokens=2000,
+                model_tier="analyst",   # Sonnet — Opus değil, dengeli
+                max_tokens=1024,
             )
         except Exception as e:
             logger.error(f"Orchestrator LLM hatası: {e}")
-            return {
-                "decision": "ABORT",
-                "reasoning": f"Orchestrator hatası: {e}",
-                "confidence": 0,
-            }
+            return {"decision": "ABORT", "reasoning": str(e), "confidence": 0}
 
-    async def _execute_trade(
-        self, symbol: str, decision: dict, risk: dict | None
-    ) -> dict:
-        """Onaylanan trade'i Binance'e gönder"""
+    async def _execute_trade(self, symbol, decision, risk):
         try:
             direction = decision.get("direction")
-            quantity = decision.get("quantity") or (risk.get("sizing", {}).get("quantity") if risk else None)
-            leverage = decision.get("leverage", settings.DEFAULT_LEVERAGE)
+            quantity  = decision.get("quantity") or (risk.get("sizing", {}).get("quantity") if risk else None)
+            leverage  = decision.get("leverage", settings.DEFAULT_LEVERAGE)
             stop_loss = decision.get("stop_loss")
-            tp1 = decision.get("take_profit_1")
-
+            tp1       = decision.get("take_profit_1")
             if not all([direction, quantity, stop_loss]):
                 return {"error": "Eksik parametre", "executed": False}
-
-            # Kaldıraç ayarla
             await self.binance.set_leverage(symbol, leverage)
             await self.binance.set_margin_type(symbol, "ISOLATED")
-
-            # Ana emir
             side = "BUY" if direction == "LONG" else "SELL"
             order = await self.binance.place_market_order(symbol, side, quantity)
-
             results = {"main_order": order, "executed": True}
-
-            # Stop-loss emri
             sl_side = "SELL" if direction == "LONG" else "BUY"
             try:
-                sl_order = await self.binance.place_stop_order(
-                    symbol, sl_side, quantity, stop_loss, "STOP_MARKET"
-                )
-                results["stop_loss_order"] = sl_order
+                results["stop_loss_order"] = await self.binance.place_stop_order(
+                    symbol, sl_side, quantity, stop_loss, "STOP_MARKET")
             except Exception as e:
-                logger.error(f"Stop-loss emri hatası: {e}")
                 results["stop_loss_error"] = str(e)
-
-            # Take-profit emri
             if tp1:
                 try:
-                    tp_order = await self.binance.place_stop_order(
-                        symbol, sl_side, quantity, tp1, "TAKE_PROFIT_MARKET"
-                    )
-                    results["take_profit_order"] = tp_order
+                    results["take_profit_order"] = await self.binance.place_stop_order(
+                        symbol, sl_side, quantity, tp1, "TAKE_PROFIT_MARKET")
                 except Exception as e:
-                    logger.error(f"TP emri hatası: {e}")
                     results["take_profit_error"] = str(e)
-
             return results
-
         except Exception as e:
-            logger.error(f"Trade execution hatası: {e}")
             return {"error": str(e), "executed": False}
 
-    async def _save_analysis(self, report: dict) -> None:
+    async def _save_analysis(self, report):
         try:
             db = get_db()
-            # datetime nesnelerini MongoDB için uygun tut
-            await db.analyses.insert_one(report)
+            save = {k: v for k, v in report.items()
+                    if k not in ("technical_15m", "technical_4h")}  # Büyük alanları çıkar
+            await db.analyses.insert_one(save)
         except Exception as e:
             logger.error(f"Analiz kaydetme hatası: {e}")

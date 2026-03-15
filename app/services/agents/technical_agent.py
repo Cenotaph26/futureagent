@@ -223,6 +223,7 @@ Bu verileri analiz ederek aşağıdaki JSON yapısında yanıt ver:
                 system=SYSTEM_PROMPT,
                 user=user_prompt,
                 model_tier="fast",  # Haiku — hızlı + ucuz
+                max_tokens=640,
             )
         except Exception as e:
             logger.error(f"LLM teknik analiz hatası: {e}")
