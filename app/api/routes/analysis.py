@@ -57,14 +57,19 @@ async def run_analysis(req: AnalysisRequest):
             sentiment = await orchestrator.sentiment_agent.analyze(req.symbol)
             yield _sse("sentiment", sentiment)
 
-            # Step 3: Orchestrator karar
             yield _sse("status", {"message": "🎯 Orchestrator karar veriyor (Opus)...", "step": 4, "total": 4})
             report = await orchestrator.analyze_and_decide(
                 symbol=req.symbol,
                 interval=req.interval,
                 auto_execute=req.auto_execute,
             )
-            yield _sse("decision", report["final_decision"])
+            # auto_executed ve execution detayını decision event'e ekle
+            decision_data = {**report["final_decision"]}
+            decision_data["auto_executed"] = report.get("auto_executed", False)
+            execution = report.get("execution") or {}
+            if execution.get("error"):
+                decision_data["execution_error"] = execution["error"]
+            yield _sse("decision", decision_data)
             yield _sse("complete", {
                 "report_id": str(report.get("_id", "")),
                 "elapsed": report.get("elapsed_seconds"),

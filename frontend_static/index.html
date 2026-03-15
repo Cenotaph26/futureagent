@@ -976,7 +976,7 @@ function handleSSE(ev,d,t0){
       }
       log(`KARAR: ${dec} (${conf}/100) — ${(d.reasoning||'').slice(0,100)}`,'agent','ORCH');
       (d.key_risks||[]).forEach(r=>log('⚠ '+r,'warn','RİSK'));
-      if(d.auto_executed){log(`POZİSYON AÇILDI: ${S.coin} ${d.direction}`,'trade','TRADE');toast(`${S.coin} ${d.direction} pozisyon açıldı`,'trade');}
+      if(d.auto_executed){log(`✅ POZİSYON AÇILDI: ${S.coin} ${d.direction} qty=${d.quantity||"?"}`,'trade','TRADE');toast(`${S.coin} ${d.direction} pozisyon açıldı`,'trade');}
       break;}
     case 'complete':log(`Tamamlandı — ${((Date.now()-t0)/1000).toFixed(1)}s`,'ok','SYS');break;
     case 'error':log('Hata: '+d.message,'err','ERR');toast(d.message,'err');['tech','sent','risk','orch'].forEach(a=>document.getElementById('ag-'+a).className='ag err');break;

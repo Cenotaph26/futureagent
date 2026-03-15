@@ -133,9 +133,15 @@ class OrchestratorAgent:
         # ── Opsiyonel işlem ───────────────────────────────────────────────────
         execution = None
         if auto_execute and final.get("decision") == "EXECUTE":
+            logger.info(f"[Orchestrator] {symbol} EXECUTE → işlem açılıyor...")
             execution = await self._execute_trade(symbol, final, risk)
+            if execution and execution.get("executed"):
+                logger.info(f"[Orchestrator] ✅ {symbol} pozisyon açıldı")
+            else:
+                logger.warning(f"[Orchestrator] ❌ {symbol} pozisyon açılamadı: {execution}")
 
         elapsed = (datetime.utcnow() - start).total_seconds()
+        actually_executed = bool(execution and execution.get("executed"))
         report = {
             "symbol": symbol, "interval": interval, "user_id": user_id,
             "technical_15m": tech_15m, "technical_1h": tech_1h, "technical_4h": tech_4h,
@@ -144,7 +150,7 @@ class OrchestratorAgent:
             "memory": memory_data, "pattern_score": pattern_score,
             "final_decision": final,
             "execution": execution,
-            "auto_executed": auto_execute and execution is not None,
+            "auto_executed": actually_executed,
             "elapsed_seconds": round(elapsed, 1),
             "created_at": datetime.utcnow(),
         }
@@ -283,31 +289,60 @@ Tüm bu bilgileri sentezle. Hafıza ve anomali verileri kararında önemli rol o
     async def _execute_trade(self, symbol, decision, risk):
         try:
             direction = decision.get("direction")
-            quantity  = decision.get("quantity") or (risk.get("sizing", {}).get("quantity") if risk else None)
-            leverage  = decision.get("leverage", settings.DEFAULT_LEVERAGE)
+            leverage  = decision.get("leverage") or (risk.get("sizing", {}).get("leverage") if risk else None) or settings.DEFAULT_LEVERAGE
             stop_loss = decision.get("stop_loss")
             tp1       = decision.get("take_profit_1")
-            if not all([direction, quantity, stop_loss]):
-                return {"error": "Eksik parametre", "executed": False}
-            await self.binance.set_leverage(symbol, leverage)
+
+            # Quantity: risk agent'tan al, yoksa bakiyeye göre hesapla
+            quantity = decision.get("quantity") or (risk.get("sizing", {}).get("quantity") if risk else None)
+            if not quantity or float(quantity) <= 0:
+                # Fallback: mevcut fiyat ile minimum pozisyon hesapla
+                entry = decision.get("entry_price", 0)
+                if entry and entry > 0:
+                    # MAX_POSITION_SIZE_USDT / entry_price / leverage
+                    min_notional = settings.MAX_POSITION_SIZE_USDT
+                    quantity = round((min_notional * leverage) / entry, 3)
+                    logger.warning(f"[Execute] quantity fallback: {quantity} ({symbol})")
+
+            if not direction:
+                logger.error(f"[Execute] Eksik direction: {symbol}")
+                return {"error": "Eksik direction", "executed": False}
+            if not quantity or float(quantity) <= 0:
+                logger.error(f"[Execute] Geçersiz quantity: {quantity} ({symbol})")
+                return {"error": f"Geçersiz quantity: {quantity}", "executed": False}
+            if not stop_loss:
+                logger.error(f"[Execute] Stop loss eksik: {symbol}")
+                return {"error": "Stop loss eksik", "executed": False}
+
+            logger.info(f"[Execute] {symbol} {direction} qty={quantity} sl={stop_loss} tp={tp1} lev={leverage}x")
+
+            await self.binance.set_leverage(symbol, int(leverage))
             await self.binance.set_margin_type(symbol, "ISOLATED")
             side = "BUY" if direction == "LONG" else "SELL"
-            order = await self.binance.place_market_order(symbol, side, quantity)
-            results = {"main_order": order, "executed": True}
+            order = await self.binance.place_market_order(symbol, side, float(quantity))
+            results = {"main_order": order, "executed": True, "direction": direction, "quantity": quantity}
+
             sl_side = "SELL" if direction == "LONG" else "BUY"
             try:
                 results["stop_loss_order"] = await self.binance.place_stop_order(
-                    symbol, sl_side, quantity, stop_loss, "STOP_MARKET")
+                    symbol, sl_side, float(quantity), float(stop_loss), "STOP_MARKET")
             except Exception as e:
                 results["stop_loss_error"] = str(e)
+                logger.warning(f"[Execute] SL emir hatası: {e}")
+
             if tp1:
                 try:
                     results["take_profit_order"] = await self.binance.place_stop_order(
-                        symbol, sl_side, quantity, tp1, "TAKE_PROFIT_MARKET")
+                        symbol, sl_side, float(quantity), float(tp1), "TAKE_PROFIT_MARKET")
                 except Exception as e:
                     results["take_profit_error"] = str(e)
+                    logger.warning(f"[Execute] TP emir hatası: {e}")
+
+            logger.info(f"[Execute] ✅ {symbol} {direction} POZİSYON AÇILDI — order={order.get('orderId')}")
             return results
+
         except Exception as e:
+            logger.error(f"[Execute] {symbol} hata: {e}", exc_info=True)
             return {"error": str(e), "executed": False}
 
     async def _save_analysis(self, report):
