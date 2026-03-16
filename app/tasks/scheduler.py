@@ -108,25 +108,15 @@ async def _do_scan_and_trade() -> None:
     redis = get_redis()
     signals_found = []
     stats = {"analyzed":0,"filtered":0,"signals":0,"positions_opened":0}
+    auto_exec = getattr(settings, "AUTO_EXECUTE_ENABLED", False)
 
-    logger.info(f"🤖 Otomatik tarama: {len(COINS)} coin, {datetime.utcnow().strftime('%H:%M UTC')} | auto_exec={getattr(__import__('app.core.config', fromlist=['settings']).settings, 'AUTO_EXECUTE_ENABLED', False)}")
+    logger.info(f"🤖 Otomatik tarama: {len(COINS)} coin, {datetime.utcnow().strftime('%H:%M UTC')} | auto_exec={auto_exec}")
 
     for symbol in COINS:
         try:
-            # 1. Kural bazlı ön filtre
-            consensus = await _multi_tf_filter(symbol)
-            if not consensus:
-                stats["filtered"] += 1
-                logger.debug(f"  ⏭ {symbol}: filtre geçmedi")
-                await asyncio.sleep(0.5)
-                continue
-
             stats["analyzed"] += 1
-            logger.info(f"  🔍 {symbol}: {consensus['dominant']} → tam analiz")
+            logger.info(f"  🔍 {symbol}: LLM analiz başlatılıyor...")
 
-            # 2. Tam LLM analizi — AUTO EXECUTE = settings'den
-            auto_exec = getattr(settings, "AUTO_EXECUTE_ENABLED", False)
-            logger.info(f"  {symbol}: auto_exec={auto_exec}")
             report = await orchestrator.analyze_and_decide(
                 symbol=symbol, interval="1h", auto_execute=auto_exec)
 
@@ -134,6 +124,8 @@ async def _do_scan_and_trade() -> None:
             dec       = decision.get("decision")
             conf      = decision.get("confidence", 0)
             direction = decision.get("direction")
+
+            logger.info(f"  ➡ {symbol}: {dec} ({conf}/100)")
 
             if dec == "EXECUTE" and conf >= MIN_CONFIDENCE:
                 stats["signals"] += 1
@@ -147,16 +139,17 @@ async def _do_scan_and_trade() -> None:
                 }
                 signals_found.append(sig)
                 await redis.setex(f"signal:{symbol}:latest", 21600, json.dumps(sig, default=str))
-                if auto_exec and report.get("auto_executed"):
+                if report.get("auto_executed"):
                     stats["positions_opened"] += 1
-                    logger.info(f"  📈 POZİSYON AÇILDI: {symbol} {direction} ({conf}/100)")
+                    logger.info(f"  ✅ POZİSYON AÇILDI: {symbol} {direction} ({conf}/100)")
                 else:
                     logger.info(f"  🎯 SİNYAL: {symbol} {direction} ({conf}/100)")
 
-            await asyncio.sleep(2)
+            await asyncio.sleep(3)  # rate limit için kısa bekleme
 
         except Exception as e:
             logger.error(f"  ❌ {symbol}: {e}")
+            await asyncio.sleep(2)
 
     # Güncel sinyal listesini Redis'e yaz
     if signals_found:
