@@ -1025,12 +1025,14 @@ async function triggerScan(){
           try{
             const ev=em[1].trim(),d=JSON.parse(dm[1]);
             if(ev==='decision'){
-              log(`${coin}: ${d.decision} (${d.confidence}/100)${d.auto_executed?' → POZİSYON AÇILDI':''}`,
+              const dec=d.decision||'undefined';
+              const conf=d.confidence||0;
+              log(`${coin}: ${dec} (${conf}/100)${d.auto_executed?' → POZİSYON AÇILDI':''}`,
                 d.auto_executed?'trade':'agent',d.auto_executed?'TRADE':'ORCH');
               if(d.auto_executed)toast(`✅ ${coin} ${d.direction} pozisyon açıldı!`,'trade');
               if(d.execution_error)log(`${coin} emir hatası: ${d.execution_error}`,'err','TRADE');
               cs[coin].analysis={...cs[coin].analysis,final_decision:d};
-              if(d.decision==='EXECUTE')cs[coin].signal=d;
+              if(dec==='EXECUTE')cs[coin].signal=d;
             }
           }catch(ex){}
         }

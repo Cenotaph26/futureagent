@@ -33,8 +33,8 @@ from app.db.database import get_db, get_redis
 logger = logging.getLogger(__name__)
 
 COINS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"]
-MIN_CONFIDENCE = 68
-MIN_PREFILTER_SCORE = 42
+MIN_CONFIDENCE = 55       # LLM güven eşiği
+MIN_PREFILTER_SCORE = 0   # filtre yok — sadece veri kontrolü
 
 
 # ── Kural Bazlı Ön Filtre (LLM yok) ──────────────────────────────────────────
@@ -60,24 +60,19 @@ async def _quick_filter(symbol: str, interval: str = "1h") -> dict | None:
         tr     = pd.concat([h-l,(h-c.shift()).abs(),(l-c.shift()).abs()],axis=1).max(axis=1)
         atr_pct= float(tr.rolling(14).mean().iloc[-1]) / price if price > 0 else 0
 
-        long_sig  = (ema20>ema50 and 38<=rsi<=65 and macd_h>0) or rsi<28
-        short_sig = (ema20<ema50 and 35<=rsi<=62 and macd_h<0) or rsi>72
-        if not (long_sig or short_sig):
+        # Minimal filtre: sadece fiyat veri kontrolü
+        # RSI, MACD kısıtı yok — LLM kendisi karar verecek
+        # Sadece EMA20 > 0 kontrolü (veri geldi mi?)
+        if ema20 <= 0 or price <= 0:
             return None
-        direction = "LONG" if long_sig else "SHORT"
-        score = 0
-        if direction == "LONG":
-            if ema20>ema50: score+=25
-            if ema50>ema200: score+=15
-            if 38<=rsi<=55: score+=20
-            if macd_h>0: score+=20
-            if rsi<30: score+=20
+        # Trend yönünü belirle (LLM'e ipucu)
+        if ema20 > ema50:
+            direction = "LONG"
+        elif ema20 < ema50:
+            direction = "SHORT"
         else:
-            if ema20<ema50: score+=25
-            if ema50<ema200: score+=15
-            if 45<=rsi<=62: score+=20
-            if macd_h<0: score+=20
-            if rsi>70: score+=20
+            direction = "LONG"  # nötr durumda LLM karar versin
+        score = 50  # sabit skor, filtre gevşek
         return {"symbol":symbol,"interval":interval,"direction":direction,"score":score,
                 "rsi":round(rsi,1),"ema_trend":"BULLISH" if ema20>ema50 else "BEARISH","atr_pct":round(atr_pct*100,3),"price":price}
     except Exception as e:
@@ -86,19 +81,15 @@ async def _quick_filter(symbol: str, interval: str = "1h") -> dict | None:
 
 
 async def _multi_tf_filter(symbol: str) -> dict | None:
-    results = await asyncio.gather(
-        _quick_filter(symbol,"15m"),_quick_filter(symbol,"1h"),_quick_filter(symbol,"4h"),
-        return_exceptions=True)
-    valid = [r for r in results if isinstance(r,dict)]
-    if not valid: return None
-    long_c  = sum(1 for r in valid if r["direction"]=="LONG")
-    short_c = sum(1 for r in valid if r["direction"]=="SHORT")
-    if long_c>=2: dominant="LONG"
-    elif short_c>=2: dominant="SHORT"
-    else: return None
-    avg_score = sum(r["score"] for r in valid if r["direction"]==dominant)/len(valid)
-    if avg_score < MIN_PREFILTER_SCORE: return None
-    return {"symbol":symbol,"dominant":dominant,"score":round(avg_score,1),"tf_count":len(valid)}
+    """Minimal filtre — sadece veri var mı kontrolü. Karar LLM'e bırakılır."""
+    try:
+        result = await _quick_filter(symbol, "1h")
+        if result is None:
+            return None
+        return {"symbol": symbol, "dominant": result["ema_trend"], "score": 50, "tf_count": 1}
+    except Exception as e:
+        logger.debug(f"Filtre {symbol}: {e}")
+        return None
 
 
 # ── 7/24 Otomatik Analiz (30dk'da bir) ───────────────────────────────────────
