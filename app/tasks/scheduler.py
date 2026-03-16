@@ -291,8 +291,8 @@ async def cleanup() -> None:
 def create_scheduler() -> AsyncIOScheduler:
     s = AsyncIOScheduler(timezone="UTC")
 
-    # 7/24 OTOMATİK ANALİZ + İŞLEM — 30 dakikada bir
-    s.add_job(auto_scan_and_trade, IntervalTrigger(minutes=30),
+    # 7/24 OTOMATİK ANALİZ + İŞLEM — 20 dakikada bir
+    s.add_job(auto_scan_and_trade, IntervalTrigger(minutes=20),
               id="auto_scan", name="7/24 Otomatik Analiz+İşlem",
               replace_existing=True, max_instances=1, misfire_grace_time=300)
 

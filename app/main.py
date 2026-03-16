@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse
 from app.core.config import settings
 from app.db.database import connect_mongo, disconnect_mongo, connect_redis, disconnect_redis, ensure_indexes
 from app.api.routes import analysis, positions, market, auth, health, signals, backtest, alerts, stream, news
-from app.tasks.scheduler import create_scheduler
+from app.tasks.scheduler import create_scheduler, auto_scan_and_trade
 
 logging.basicConfig(level=getattr(logging, settings.LOG_LEVEL),
     format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s", stream=sys.stdout)
@@ -35,7 +35,10 @@ async def lifespan(app: FastAPI):
     await ensure_indexes()
     _scheduler = create_scheduler()
     _scheduler.start()
-    logger.info("✅ Tüm servisler hazır — Trailing stop her 5dk aktif")
+    logger.info("✅ Tüm servisler hazır — Scheduler aktif")
+    # Başlangıçta hemen bir tarama yap (deploy sonrası 20dk beklemeden)
+    import asyncio
+    asyncio.create_task(auto_scan_and_trade())
     yield
     logger.info("🛑 Kapatılıyor...")
     if _scheduler:

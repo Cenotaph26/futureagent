@@ -138,10 +138,21 @@ async def stream_status():
                 scan_raw = await redis.get("futuragents:last_scan")
                 scan = json.loads(scan_raw) if scan_raw else {}
                 anom_raw = await redis.get("futuragents:critical_anomalies")
+                # Scheduler next run
+                next_run = None
+                try:
+                    from app.main import _scheduler
+                    if _scheduler and _scheduler.running:
+                        job = _scheduler.get_job("auto_scan")
+                        if job and job.next_run_time:
+                            next_run = job.next_run_time.isoformat()
+                except Exception:
+                    pass
                 yield _sse("status", {
                     "last_scan": scan.get("time"),
                     "last_scan_stats": scan,
                     "critical_anomalies": len(json.loads(anom_raw)) if anom_raw else 0,
+                    "next_scan": next_run,
                     "ts": datetime.utcnow().isoformat(),
                 })
                 await asyncio.sleep(30)

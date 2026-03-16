@@ -339,6 +339,7 @@ html,body{background:var(--bg0);color:var(--t1);font-family:var(--sans);font-siz
   <div class="tb" onclick="swTab('log',this)">Sistem Logu</div>
   <div class="tabs-right">
     <span class="scan-stat" id="scan-stat">Tarama: —</span>
+    <span class="scan-stat" id="next-scan" style="color:var(--up)"></span>
   </div>
 </div>
 
@@ -483,7 +484,18 @@ const newsStore=[];
 const cs={};COINS.forEach(c=>{cs[c]={price:0,change:0,signal:null,analysis:null,analyzing:false,liveLog:[]};});
 
 // Clock
-setInterval(()=>document.getElementById('clock').textContent=new Date().toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit',second:'2-digit'}),1000);
+setInterval(()=>{
+  document.getElementById('clock').textContent=new Date().toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  // Sonraki tarama sayacı (30dk = 1800s)
+  const ns=document.getElementById('next-scan');
+  if(ns&&window._lastScanTime){
+    const scanBase=window._nextScanTime||0;const elapsed=scanBase?Math.max(0,Math.floor((scanBase-Date.now())/1000)):Math.max(0,1200-Math.floor((Date.now()-(window._lastScanTime||Date.now()))/1000));
+    const remaining=elapsed;
+    const m=Math.floor(remaining/60);const s=remaining%60;
+    ns.textContent=`| Sonraki: ${m}:${s.toString().padStart(2,'0')}`;
+    ns.style.color=remaining<120?'var(--warn)':remaining<300?'var(--up)':'var(--t3)';
+  }
+},1000);
 
 // Utils
 const f=(n,d=2)=>n==null||isNaN(+n)?'—':Number(n).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
@@ -669,7 +681,9 @@ function startDash(){
   dashES.addEventListener('scan_status',e=>{
     const d=JSON.parse(e.data);
     const t=d.time?new Date(d.time).toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'}):'—';
-    document.getElementById('scan-stat').textContent=`Tarama: ${t} | A:${d.analyzed||0} S:${d.signals||0}`;
+    document.getElementById('scan-stat').textContent=`Son tarama: ${t} | A:${d.analyzed||0} S:${d.signals||0} P:${d.positions_opened||0}`;
+    if(d.time)window._lastScanTime=new Date(d.time).getTime();
+    if(d.next_scan){window._nextScanTime=new Date(d.next_scan).getTime();}
   });
   dashES.addEventListener('critical_anomaly',e=>{
     const d=JSON.parse(e.data);
@@ -713,7 +727,10 @@ function startNews(){
       if((news.key_events||[]).length>0){
         addEvent(sym,news.overall_sentiment,news.key_events[0],newsImpact(news),news.analyzed_at);
       }
-      log(`Haber: ${sym} ${(news.overall_sentiment||'').toUpperCase()} — ${(news.summary||'').slice(0,60)}`,'news','HABER');
+      // Sadece yüksek etkili haberleri logla
+      if(item.imp==='H'){
+        log(`[HABER] ${sym.replace('USDT','')} ${sent} — ${(news.summary||'').slice(0,60)}`,'news','HABER');
+      }
     });
     renderNews();document.getElementById('nc-cnt').textContent=newsStore.length+' haber';renderNewsF();
   });
