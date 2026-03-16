@@ -104,18 +104,21 @@ async def _multi_tf_filter(symbol: str) -> dict | None:
 # ── 7/24 Otomatik Analiz (30dk'da bir) ───────────────────────────────────────
 
 async def auto_scan_and_trade() -> None:
-    """
-    7/24 ÇALIŞAN ANA AJAN.
-    Kullanıcı aksiyonu gerektirmez.
-    Güçlü sinyal → pozisyon aç (auto_execute=True).
-    """
+    """7/24 ÇALIŞAN ANA AJAN."""
+    try:
+        await _do_scan_and_trade()
+    except Exception as e:
+        logger.error(f"[AutoScan] Kritik hata (scheduler devam edecek): {e}", exc_info=True)
+
+
+async def _do_scan_and_trade() -> None:
     from app.services.agents.orchestrator import OrchestratorAgent
     orchestrator = OrchestratorAgent()
     redis = get_redis()
     signals_found = []
     stats = {"analyzed":0,"filtered":0,"signals":0,"positions_opened":0}
 
-    logger.info(f"🤖 Otomatik tarama: {len(COINS)} coin, {datetime.utcnow().strftime('%H:%M UTC')}")
+    logger.info(f"🤖 Otomatik tarama: {len(COINS)} coin, {datetime.utcnow().strftime('%H:%M UTC')} | auto_exec={getattr(__import__('app.core.config', fromlist=['settings']).settings, 'AUTO_EXECUTE_ENABLED', False)}")
 
     for symbol in COINS:
         try:
@@ -200,7 +203,7 @@ async def refresh_news() -> None:
         new_items = await agent.poll_and_analyze()
         if new_items:
             sentiments = {r["symbol"]: r.get("overall_sentiment","?") for r in new_items}
-            logger.info(f"[News] {len(new_items)} yeni haber: {sentiments}")
+            logger.debug(f"[News] {len(new_items)} yeni haber: {sentiments}")
         else:
             logger.debug("[News] Yeni haber yok")
     except Exception as e:
@@ -321,3 +324,30 @@ def create_scheduler() -> AsyncIOScheduler:
               id="cleanup", name="Temizlik", replace_existing=True)
 
     return s
+
+
+# ── Scheduler Watchdog ────────────────────────────────────────────────────────
+async def scheduler_watchdog(scheduler) -> None:
+    """
+    Scheduler'ın çalışıp çalışmadığını her 5 dakikada kontrol eder.
+    Durmuşsa yeniden başlatır.
+    """
+    import asyncio
+    while True:
+        try:
+            await asyncio.sleep(300)  # 5 dakika
+            if not scheduler.running:
+                logger.warning("[Watchdog] Scheduler durmuş! Yeniden başlatılıyor...")
+                scheduler.start()
+            else:
+                # auto_scan job'ının next_run_time'ını kontrol et
+                job = scheduler.get_job("auto_scan")
+                if job and job.next_run_time:
+                    from datetime import timezone
+                    now = datetime.now(timezone.utc)
+                    delay = (job.next_run_time - now).total_seconds()
+                    if delay > 1500:  # 25 dakikadan fazla beklemesi garip
+                        logger.warning(f"[Watchdog] auto_scan çok uzun bekliyor ({delay:.0f}s), acil tarama başlatılıyor")
+                        await auto_scan_and_trade()
+        except Exception as e:
+            logger.error(f"[Watchdog] {e}")

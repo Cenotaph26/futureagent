@@ -36,9 +36,12 @@ async def lifespan(app: FastAPI):
     _scheduler = create_scheduler()
     _scheduler.start()
     logger.info("✅ Tüm servisler hazır — Scheduler aktif")
-    # Başlangıçta hemen bir tarama yap (deploy sonrası 20dk beklemeden)
     import asyncio
+    # Başlangıçta hemen bir tarama yap
     asyncio.create_task(auto_scan_and_trade())
+    # Watchdog - scheduler'ı izler
+    from app.tasks.scheduler import scheduler_watchdog
+    asyncio.create_task(scheduler_watchdog(_scheduler))
     yield
     logger.info("🛑 Kapatılıyor...")
     if _scheduler:
