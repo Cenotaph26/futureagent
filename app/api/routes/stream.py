@@ -63,10 +63,17 @@ async def stream_dashboard():
                 if sigs_raw:
                     yield _sse("signals", {"signals": json.loads(sigs_raw)})
 
-                # Son tarama zamanı
+                # Son tarama zamanı + bir sonraki tarama
                 scan_raw = await redis.get("futuragents:last_scan")
                 if scan_raw:
-                    yield _sse("scan_status", json.loads(scan_raw))
+                    scan_data = json.loads(scan_raw)
+                    # Bir sonraki tarama zamanını ekle (20dk = 1200s)
+                    if scan_data.get("time"):
+                        from datetime import timezone
+                        last_dt = datetime.fromisoformat(scan_data["time"].replace("Z",""))
+                        next_dt = last_dt + timedelta(seconds=1200)
+                        scan_data["next_scan"] = next_dt.isoformat()
+                    yield _sse("scan_status", scan_data)
 
                 # Kritik anomaliler
                 anom_raw = await redis.get("futuragents:critical_anomalies")

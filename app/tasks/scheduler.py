@@ -117,8 +117,11 @@ async def _do_scan_and_trade() -> None:
             stats["analyzed"] += 1
             logger.info(f"  🔍 {symbol}: LLM analiz başlatılıyor...")
 
-            report = await orchestrator.analyze_and_decide(
-                symbol=symbol, interval="1h", auto_execute=auto_exec)
+            # 120 saniye timeout — takılmayı önler
+            report = await asyncio.wait_for(
+                orchestrator.analyze_and_decide(symbol=symbol, interval="1h", auto_execute=auto_exec),
+                timeout=120
+            )
 
             decision = report.get("final_decision", {})
             dec       = decision.get("decision")

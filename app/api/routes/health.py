@@ -16,11 +16,32 @@ async def health():
         checks["mongodb"] = f"error: {e}"
         checks["status"] = "degraded"
     try:
-        await get_redis().ping()
+        redis = get_redis()
+        await redis.ping()
         checks["redis"] = "ok"
+        # Son tarama bilgisi
+        import json
+        scan_raw = await redis.get("futuragents:last_scan")
+        if scan_raw:
+            scan = json.loads(scan_raw)
+            checks["last_scan_time"] = scan.get("time")
+            checks["last_scan_stats"] = scan
     except Exception as e:
         checks["redis"] = f"error: {e}"
         checks["status"] = "degraded"
+    # Scheduler durumu
+    try:
+        from app.main import _scheduler
+        from datetime import timezone
+        if _scheduler and _scheduler.running:
+            job = _scheduler.get_job("auto_scan")
+            checks["scheduler"] = "running"
+            if job and job.next_run_time:
+                checks["next_scan"] = job.next_run_time.isoformat()
+        else:
+            checks["scheduler"] = "stopped"
+    except Exception:
+        checks["scheduler"] = "unknown"
     return checks
 
 

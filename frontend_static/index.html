@@ -1263,6 +1263,28 @@ async function checkHealth(){
     document.getElementById('d-bnc').className='conn-dot'+(ok?' live':'');
     document.getElementById('l-bnc').textContent='Binance '+(d.testnet===false?'Mainnet':'Testnet');
     if(d.testnet===false){document.getElementById('mode-tag').textContent='MAİNNET';document.getElementById('mode-tag').className='env-tag main';}
+    // Scheduler durumu → countdown güncelle
+    if(d.scheduler==='stopped'){
+      document.getElementById('scan-dot').className='scan-dot';
+      document.getElementById('scan-stat').textContent='Scheduler: DURDURULDU';
+    }
+    // Son tarama zamanı
+    if(d.last_scan_time){
+      _lastScanTime=new Date(d.last_scan_time).getTime();
+      LS.s('lastScan',_lastScanTime);
+    }
+    // Bir sonraki tarama zamanı — scheduler'dan direkt
+    if(d.next_scan){
+      _nextScanTime=new Date(d.next_scan).getTime();
+    } else if(_lastScanTime>0){
+      _nextScanTime=_lastScanTime+SCAN_INTERVAL_MS;
+    }
+    // Scan stats
+    if(d.last_scan_stats){
+      const s=d.last_scan_stats;
+      const t=s.time?new Date(s.time).toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'}):'—';
+      document.getElementById('scan-stat').textContent=`Son: ${t} | A:${s.analyzed||0} S:${s.signals||0} P:${s.positions_opened||0}`;
+    }
   }catch(e){
     document.getElementById('d-api').className='conn-dot';
     document.getElementById('l-api').textContent='Bağlantı Yok';
@@ -1322,7 +1344,9 @@ async function preloadData(){
 })();
 
 checkHealth();loadPositions();initResizers();preloadData();startDash();startNews();
-setInterval(loadPositions,20000);setInterval(checkHealth,30000);setInterval(()=>loadChart(),60000);
+setInterval(loadPositions,20000);
+setInterval(checkHealth,30000);  // 30s - countdown için kritik
+setInterval(()=>loadChart(),60000);
 </script>
 </body>
 </html>
