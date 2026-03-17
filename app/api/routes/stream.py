@@ -58,11 +58,6 @@ async def stream_dashboard():
                     }
                 yield _sse("prices", {"coins": coin_data, "ts": datetime.utcnow().isoformat()})
 
-                # Aktif sinyaller
-                sigs_raw = await redis.get("futuragents:active_signals")
-                if sigs_raw:
-                    yield _sse("signals", {"signals": json.loads(sigs_raw)})
-
                 # Son tarama zamanı + bir sonraki tarama
                 scan_raw = await redis.get("futuragents:last_scan")
                 if scan_raw:

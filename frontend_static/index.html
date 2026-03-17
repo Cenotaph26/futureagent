@@ -877,13 +877,19 @@ function startDash(){
     updateSigPanel();
     if(document.getElementById('pcoin').classList.contains('show'))updateCoinPrices();
   });
+  // Görülen sinyal ID'lerini takip et - aynı sinyali iki kez loglama
+  const _seenSigs=new Set();
   dashES.addEventListener('signals',e=>{
     const d=JSON.parse(e.data);
     (d.signals||[]).forEach(sig=>{
+      const key=`${sig.symbol}-${sig.timestamp||sig.direction}`;
       cs[sig.symbol]={...cs[sig.symbol],signal:sig};
-      const ae=sig.auto_executed;
-      log(`${sig.symbol} ${sig.direction} (${sig.confidence}/100)${ae?' → POZİSYON AÇILDI':''}`,ae?'trade':'ok',ae?'TRADE':'SİNYAL');
-      if(ae)toast(`✅ ${sig.symbol} ${sig.direction} AÇILDI`,'trade');
+      // Daha önce görülmediyse logla
+      if(!_seenSigs.has(key)){
+        _seenSigs.add(key);
+        if(_seenSigs.size>50)_seenSigs.delete(_seenSigs.values().next().value);
+        log(`${sig.symbol} ${sig.direction} (${sig.confidence}/100) — Yeni sinyal`,'ok','SİNYAL');
+      }
     });
     updateSigPanel();
   });

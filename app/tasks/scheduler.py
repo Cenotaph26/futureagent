@@ -65,16 +65,18 @@ async def _quick_filter(symbol: str, interval: str = "1h") -> dict | None:
         # Sadece EMA20 > 0 kontrolü (veri geldi mi?)
         if ema20 <= 0 or price <= 0:
             return None
-        # Trend yönünü belirle (LLM'e ipucu)
-        if ema20 > ema50:
-            direction = "LONG"
-        elif ema20 < ema50:
-            direction = "SHORT"
-        else:
-            direction = "LONG"  # nötr durumda LLM karar versin
-        score = 50  # sabit skor, filtre gevşek
-        return {"symbol":symbol,"interval":interval,"direction":direction,"score":score,
-                "rsi":round(rsi,1),"ema_trend":"BULLISH" if ema20>ema50 else "BEARISH","atr_pct":round(atr_pct*100,3),"price":price}
+
+        # Anlamlı filtre: net trend olmalı
+        long_ok  = ema20 > ema50 and macd_h > 0  # bullish yapı
+        short_ok = ema20 < ema50 and macd_h < 0  # bearish yapı
+        extreme  = rsi < 28 or rsi > 78           # aşırı bölge
+
+        if not (long_ok or short_ok or extreme):
+            return None  # net sinyal yok, LLM maliyeti boşa harcar
+
+        direction = "LONG" if (long_ok or rsi < 28) else "SHORT"
+        return {"symbol":symbol,"interval":interval,"direction":direction,
+                "rsi":round(rsi,1),"price":price}
     except Exception as e:
         logger.debug(f"Filtre {symbol}/{interval}: {e}")
         return None
@@ -114,13 +116,21 @@ async def _do_scan_and_trade() -> None:
 
     for symbol in COINS:
         try:
-            stats["analyzed"] += 1
-            logger.info(f"  🔍 {symbol}: LLM analiz başlatılıyor...")
+            # Hızlı ön filtre - sadece EMA trend kontrolü (LLM yok, ~50ms)
+            pre = await _quick_filter(symbol, "1h")
+            if not pre:
+                stats["filtered"] += 1
+                logger.info(f"  ⏭ {symbol}: ön filtre geçmedi — LLM atlandı")
+                await asyncio.sleep(1)
+                continue
 
-            # 120 saniye timeout — takılmayı önler
+            stats["analyzed"] += 1
+            logger.info(f"  🔍 {symbol}: {pre['direction']} sinyal → LLM analiz")
+
+            # 90 saniye timeout
             report = await asyncio.wait_for(
                 orchestrator.analyze_and_decide(symbol=symbol, interval="1h", auto_execute=auto_exec),
-                timeout=120
+                timeout=90
             )
 
             decision = report.get("final_decision", {})
