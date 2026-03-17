@@ -389,6 +389,7 @@ input[type=checkbox]{cursor:pointer}
   <div class="tb" onclick="swTab('coin',this)">🪙 5 Coin Kartları</div>
   <div class="tb" onclick="swTab('news',this)">📰 Haberler <span class="tb-badge" id="news-badge">0</span></div>
   <div class="tb" onclick="swTab('anal',this)">📊 Analitik</div>
+  <div class="tb" onclick="swTab('perf',this)">🏆 Performans</div>
   <div class="tb" onclick="swTab('log',this)">🖥 Sistem Logu</div>
   <div class="tabs-info">
     <div class="scan-info">
@@ -518,6 +519,9 @@ input[type=checkbox]{cursor:pointer}
 
   <!-- ANALYTICS -->
   <div class="pane pblock" id="panal"></div>
+
+  <!-- PERFORMANCE -->
+  <div class="pane pblock" id="pperf"></div>
 
   <!-- LOG -->
   <div class="pane" id="plog" style="flex-direction:column">
@@ -660,7 +664,7 @@ function initResizers(){
 // ═══════════════════════════════════════════════════════
 // TABS
 // ═══════════════════════════════════════════════════════
-const PANES={ov:{id:'pov',cls:'pgrid'},coin:{id:'pcoin',cls:'pgrid'},news:{id:'pnews',cls:'pgrid'},anal:{id:'panal',cls:'pblock'},log:{id:'plog',cls:''}};
+const PANES={ov:{id:'pov',cls:'pgrid'},coin:{id:'pcoin',cls:'pgrid'},news:{id:'pnews',cls:'pgrid'},anal:{id:'panal',cls:'pblock'},perf:{id:'pperf',cls:'pblock'},log:{id:'plog',cls:''}};
 function swTab(n,btn){
   document.querySelectorAll('.tb').forEach(b=>b.classList.remove('active'));btn.classList.add('active');
   Object.entries(PANES).forEach(([k,p])=>{
@@ -674,6 +678,7 @@ function swTab(n,btn){
   if(n==='ov')setTimeout(()=>{if(chart)chart.timeScale().fitContent();},60);
   if(n==='coin')renderCoinCards();
   if(n==='anal')renderAnalytics();
+  if(n==='perf')renderPerformance();
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1211,8 +1216,207 @@ async function closePos(sym){
 }
 
 // ═══════════════════════════════════════════════════════
-// ANALYTICS
+// PERFORMANCE SCREEN
 // ═══════════════════════════════════════════════════════
+async function renderPerformance(){
+  const pane=document.getElementById('pperf');
+  pane.innerHTML=`<div style="padding:16px;text-align:center;font-size:11px;color:var(--t3)">⏳ Performans yükleniyor...</div>`;
+  try{
+    const[sum,hourly,open,levStats]=await Promise.all([
+      fetch(`${API}/api/performance/summary?days=30`).then(r=>r.json()),
+      fetch(`${API}/api/performance/hourly?days=30`).then(r=>r.json()),
+      fetch(`${API}/api/performance/open-trades`).then(r=>r.json()),
+      fetch(`${API}/api/performance/leverage-stats?days=30`).then(r=>r.json()),
+    ]);
+
+    const pnlColor=n=>+n>0?'var(--up)':+n<0?'var(--dn)':'var(--t2)';
+    const fPct=n=>n==null?'—':(+n>=0?'+':'')+Number(n).toFixed(2)+'%';
+    const fDol=n=>n==null?'—':(+n>=0?'+$':'−$')+Math.abs(Number(n)).toFixed(2);
+
+    // Saat ısı haritası
+    const curH=new Date().getUTCHours();
+    const maxAbs=Math.max(...(hourly||[]).map(h=>Math.abs(h.avg_pnl||0)),0.1);
+    const heatMap=Array.from({length:24},(_,h)=>{
+      const row=(hourly||[]).find(x=>x.hour===h);
+      if(!row)return`<div class="hh-cell empty" title="UTC ${h}:00 — Veri yok">${h}</div>`;
+      const int=Math.min(1,Math.abs(row.avg_pnl)/maxAbs);
+      const clr=row.avg_pnl>0?`rgba(63,185,80,${0.12+int*0.7})`:`rgba(248,81,73,${0.12+int*0.7})`;
+      const cur=h===curH?'border:1px solid var(--warn);':'';
+      return`<div class="hh-cell" style="background:${clr};${cur}" title="UTC ${h}:00 | ${row.trades} işlem | WR:${row.win_rate}% | ort.${fPct(row.avg_pnl)}">
+        <span style="font-size:9px">${h}</span>
+        <span style="font-size:7px;color:rgba(255,255,255,.7)">${row.win_rate}%</span>
+      </div>`;
+    }).join('');
+
+    // Açık pozisyonlar
+    const openRows=(Array.isArray(open)&&open.length)?open.map(t=>`<tr>
+      <td><b style="font-family:var(--mono);font-size:11px">${t.symbol.replace('USDT','')}</b></td>
+      <td><span style="color:${t.direction==='LONG'?'var(--up)':'var(--dn)'};font-weight:700;font-size:10px">${t.direction}</span></td>
+      <td style="font-family:var(--mono);font-size:10px">${f(t.entry_price,t.entry_price<10?4:2)}</td>
+      <td style="font-family:var(--mono);font-size:10px">${f(t.mark_price,t.mark_price<10?4:2)}</td>
+      <td style="color:var(--pur);font-weight:700;font-family:var(--mono)">${t.leverage}x</td>
+      <td style="font-family:var(--mono);color:var(--dn);font-size:10px">${t.stop_loss?f(t.stop_loss,4):'—'}</td>
+      <td style="font-family:var(--mono);color:var(--up);font-size:10px">${t.take_profit_1?f(t.take_profit_1,4):'—'}</td>
+      <td style="color:${pnlColor(t.pnl_pct)};font-weight:700;font-family:var(--mono)">${fPct(t.pnl_pct)}</td>
+      <td style="color:${pnlColor(t.unrealized_pnl)};font-weight:700;font-family:var(--mono)">${fDol(t.unrealized_pnl)}</td>
+    </tr>`).join(''):'<tr><td colspan="9" style="text-align:center;color:var(--t3);padding:16px">Açık pozisyon yok</td></tr>';
+
+    // Coin tablosu
+    const coinRows=(sum.coin_breakdown||[]).map(c=>`<tr>
+      <td style="font-weight:700;font-family:var(--mono)">${c.symbol.replace('USDT','')}</td>
+      <td style="font-family:var(--mono)">${c.total}</td>
+      <td style="color:var(--up);font-family:var(--mono)">${c.wins}</td>
+      <td style="color:var(--dn);font-family:var(--mono)">${c.losses}</td>
+      <td style="color:${c.win_rate>=55?'var(--up)':c.win_rate>=45?'var(--warn)':'var(--dn)'};font-weight:700;font-family:var(--mono)">${c.win_rate}%</td>
+      <td style="color:${pnlColor(c.total_pnl)};font-weight:700;font-family:var(--mono)">${fPct(c.total_pnl)}</td>
+    </tr>`).join('')||'<tr><td colspan="6" style="text-align:center;color:var(--t3);padding:16px">Henüz veri yok — işlemler birikecek</td></tr>';
+
+    // Kaldıraç dağılımı
+    const levRows=(Array.isArray(levStats)?levStats:[]).map(l=>`<tr>
+      <td style="font-family:var(--mono);font-weight:700;color:var(--pur)">${l._id}x</td>
+      <td style="font-family:var(--mono)">${l.count}</td>
+      <td style="font-family:var(--mono);color:var(--t2)">${Math.round(l.avg_confidence||0)}/100</td>
+    </tr>`).join('')||'<tr><td colspan="3" style="text-align:center;color:var(--t3);padding:12px">Veri yok</td></tr>';
+
+    // Analiz kalitesi
+    const anaRows=(sum.analyze_stats||[]).sort((a,b)=>b.count-a.count).map(a=>`<tr>
+      <td style="font-weight:700;color:${a._id==='EXECUTE'?'var(--up)':a._id==='WAIT'?'var(--warn)':'var(--dn)'}">${a._id||'?'}</td>
+      <td style="font-family:var(--mono)">${a.count}</td>
+      <td style="font-family:var(--mono);color:var(--t2)">${Math.round(a.avg_confidence||0)}/100</td>
+      <td style="font-family:var(--mono);color:var(--pur)">${a.avg_leverage?Math.round(a.avg_leverage)+'x':'—'}</td>
+    </tr>`).join('')||'<tr><td colspan="4" style="text-align:center;color:var(--t3);padding:12px">Veri yok</td></tr>';
+
+    pane.innerHTML=`<style>
+    .pg{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:10px}
+    .pc{background:var(--bg1);border:1px solid var(--border);border-radius:var(--r6);overflow:hidden}
+    .ph{padding:8px 12px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--t2);background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:5px}
+    .pb{padding:10px 12px}
+    .pstat{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:14px 8px;text-align:center}
+    .pval{font-size:24px;font-weight:700;font-family:var(--mono);line-height:1}
+    .plbl{font-size:9px;color:var(--t3);margin-top:5px;text-transform:uppercase;letter-spacing:.5px}
+    .psub{font-size:10px;color:var(--t2);margin-top:3px;font-family:var(--mono)}
+    .sr{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--border)}
+    .sr:last-child{border:none}
+    .sk{font-size:10px;color:var(--t2)}.sv{font-size:11px;font-weight:600;font-family:var(--mono)}
+    .hh-grid{display:flex;gap:3px;flex-wrap:wrap;padding:8px 12px}
+    .hh-cell{width:38px;height:38px;border-radius:4px;background:var(--bg3);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:default;transition:transform .1s;gap:1px}
+    .hh-cell:hover{transform:scale(1.12);z-index:2;position:relative}
+    .hh-cell.empty{color:var(--t3)}
+    .pt{width:100%;border-collapse:collapse;font-size:10px}
+    .pt th{text-align:left;padding:5px 8px;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--t3);border-bottom:1px solid var(--border);background:var(--bg2)}
+    .pt td{padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.03);color:var(--t1)}
+    .pt tr:hover td{background:rgba(255,255,255,.02)}
+    .wbar{height:5px;background:var(--bg3);border-radius:3px;overflow:hidden;margin-top:4px;width:80px}
+    .wfill{height:100%;background:linear-gradient(90deg,var(--up),var(--cyan));border-radius:3px}
+    .sync-btn{padding:4px 10px;background:var(--blue-bg);border:1px solid rgba(88,166,255,.2);color:var(--blue);font-size:9px;border-radius:3px;cursor:pointer;font-family:var(--sans);transition:all .1s}
+    .sync-btn:hover{background:rgba(88,166,255,.15)}
+    </style>
+    <div class="pg">
+      <!-- KPI 1: Toplam PnL -->
+      <div class="pc">
+        <div class="pstat">
+          <div class="pval" style="color:${pnlColor(sum.total_pnl_pct)}">${fPct(sum.total_pnl_pct||0)}</div>
+          <div class="plbl">Toplam PnL (30 gün)</div>
+          <div class="psub">${fDol(sum.total_pnl||0)} · ${sum.total_trades||0} işlem</div>
+        </div>
+      </div>
+      <!-- KPI 2: Win Rate -->
+      <div class="pc">
+        <div class="pstat">
+          <div class="pval" style="color:${(sum.win_rate||0)>=55?'var(--up)':(sum.win_rate||0)>=45?'var(--warn)':'var(--dn)'}">${sum.win_rate||0}%</div>
+          <div class="plbl">Win Rate</div>
+          <div class="wbar"><div class="wfill" style="width:${sum.win_rate||0}%"></div></div>
+          <div class="psub">${sum.wins||0} kazanç · ${sum.losses||0} kayıp</div>
+        </div>
+      </div>
+      <!-- KPI 3: Avg W/L -->
+      <div class="pc">
+        <div class="pstat">
+          <div class="pval" style="color:var(--up)">${fPct(sum.avg_win_pct||0)}</div>
+          <div class="plbl">Ortalama Kazanç</div>
+          <div class="psub" style="color:var(--dn)">${fPct(sum.avg_loss_pct||0)} ort. kayıp</div>
+        </div>
+      </div>
+      <!-- KPI 4: Profit Factor -->
+      <div class="pc">
+        <div class="pstat">
+          <div class="pval" style="color:${(sum.profit_factor||0)>=1.5?'var(--up)':(sum.profit_factor||0)>=1?'var(--warn)':'var(--dn)'}">${sum.profit_factor||'—'}</div>
+          <div class="plbl">Profit Factor</div>
+          <div class="psub">En iyi: ${fPct(sum.best_trade_pct||0)}</div>
+        </div>
+      </div>
+
+      <!-- Açık Pozisyonlar -->
+      <div class="pc" style="grid-column:1/-1">
+        <div class="ph">📂 Açık Pozisyonlar <span style="margin-left:auto;font-size:9px;color:var(--t3)">${Array.isArray(open)?open.length:0} pozisyon</span>
+          <button class="sync-btn" onclick="syncTrades()">↻ Sync</button>
+        </div>
+        <table class="pt">
+          <thead><tr><th>Sembol</th><th>Yön</th><th>Giriş</th><th>Mark</th><th>Kaldıraç</th><th>Stop</th><th>TP</th><th>PnL%</th><th>PnL $</th></tr></thead>
+          <tbody>${openRows}</tbody>
+        </table>
+      </div>
+
+      <!-- Coin Bazlı + Detaylar -->
+      <div class="pc" style="grid-column:1/3">
+        <div class="ph">🪙 Coin Bazlı Performans</div>
+        <table class="pt">
+          <thead><tr><th>Coin</th><th>İşlem</th><th>Kazanç</th><th>Kayıp</th><th>Win%</th><th>PnL%</th></tr></thead>
+          <tbody>${coinRows}</tbody>
+        </table>
+      </div>
+
+      <!-- Detay istatistikler -->
+      <div class="pc">
+        <div class="ph">📋 İstatistikler</div>
+        <div class="pb">
+          <div class="sr"><span class="sk">Toplam işlem</span><span class="sv">${sum.total_trades||0}</span></div>
+          <div class="sr"><span class="sk">Açık pozisyon</span><span class="sv" style="color:var(--warn)">${Array.isArray(open)?open.length:0}</span></div>
+          <div class="sr"><span class="sk">En iyi işlem</span><span class="sv" style="color:var(--up)">${fPct(sum.best_trade_pct||0)}</span></div>
+          <div class="sr"><span class="sk">En kötü işlem</span><span class="sv" style="color:var(--dn)">${fPct(sum.worst_trade_pct||0)}</span></div>
+          <div class="sr"><span class="sk">Profit Factor</span><span class="sv" style="color:var(--blue)">${sum.profit_factor||'—'}</span></div>
+          <div class="sr"><span class="sk">Ort. kazanç/kayıp</span><span class="sv">${fPct(sum.avg_win_pct||0)} / ${fPct(sum.avg_loss_pct||0)}</span></div>
+        </div>
+      </div>
+
+      <!-- Kaldıraç + Analiz kalitesi -->
+      <div class="pc">
+        <div class="ph">⚡ Kaldıraç Dağılımı</div>
+        <table class="pt">
+          <thead><tr><th>Kaldıraç</th><th>Kullanım</th><th>Ort. Güven</th></tr></thead>
+          <tbody>${levRows}</tbody>
+        </table>
+      </div>
+      <div class="pc" style="grid-column:1/3">
+        <div class="ph">🎯 Analiz Kalitesi</div>
+        <table class="pt">
+          <thead><tr><th>Karar</th><th>Sayı</th><th>Ort. Güven</th><th>Ort. Kaldıraç</th></tr></thead>
+          <tbody>${anaRows}</tbody>
+        </table>
+      </div>
+
+      <!-- Saat Isı Haritası -->
+      <div class="pc" style="grid-column:1/-1">
+        <div class="ph">🕐 UTC Saat Bazlı Performans
+          <span style="margin-left:8px;font-size:8px;color:var(--t3);font-weight:400">Yeşil=karlı · Kırmızı=zararlı · Sarı=şu an · Hover=detay</span>
+        </div>
+        <div class="hh-grid">${heatMap}</div>
+      </div>
+    </div>`;
+  }catch(e){
+    document.getElementById('pperf').innerHTML=`<div style="padding:20px;text-align:center;color:var(--dn)">Performans yüklenemedi: ${e.message}<br><small style="color:var(--t3)">Trade geçmişi birikince bu ekran dolacak</small></div>`;
+  }
+}
+
+async function syncTrades(){
+  try{
+    const r=await fetch(`${API}/api/performance/sync-closed`,{method:'POST'}).then(r=>r.json());
+    toast(`${r.synced||0} trade senkronize edildi`,'ok');
+    setTimeout(renderPerformance,1000);
+  }catch(e){toast('Sync hatası: '+e.message,'err');}
+}
+
+
 async function renderAnalytics(){
   try{
     const[stats,sigs]=await Promise.all([

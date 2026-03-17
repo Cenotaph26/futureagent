@@ -32,6 +32,9 @@ class TrailingStopAgent:
             logger.warning(f"[TrailingStop] Pozisyon alınamadı: {e}")
             return {"checked": 0, "actions": []}
 
+        # Kapanan pozisyonların PnL'ini DB'ye yaz
+        await self._sync_closed_pnl(positions)
+
         if not positions:
             return {"checked": 0, "actions": []}
 
@@ -139,3 +142,36 @@ class TrailingStopAgent:
                 "created_at": datetime.utcnow(), "read": False})
         except Exception as e:
             logger.error(f"Alert kaydı hatası: {e}")
+
+    async def _sync_closed_pnl(self, live_positions: list):
+        """Kapanan pozisyonları tespit edip DB'ye PnL yaz"""
+        db = get_db()
+        try:
+            # DB'deki açık trade'ler
+            open_trades = []
+            async for t in db.trades.find({"status": "open"}):
+                open_trades.append(t)
+            if not open_trades:
+                return
+            # Canlı pozisyon sembollerini al
+            live_syms = {p["symbol"] for p in live_positions
+                         if abs(float(p.get("positionAmt", 0))) > 0.0001}
+            # DB'de open ama canlıda yok = kapandı
+            for trade in open_trades:
+                sym = trade.get("symbol")
+                if sym and sym not in live_syms:
+                    # Binance'den gerçekleşen PnL'i çek
+                    try:
+                        history = await self.binance.get_trade_history(sym, limit=10)
+                        realized = sum(float(h.get("realizedPnl", 0)) for h in history
+                                       if str(h.get("orderId")) == str(trade.get("order_id"))
+                                       or h.get("time", 0) > trade.get("created_at",
+                                          datetime.utcnow()).timestamp() * 1000 - 86400000)
+                    except Exception:
+                        realized = None
+                    update = {"status": "closed", "closed_at": datetime.utcnow()}
+                    if realized is not None:
+                        update["pnl"] = round(realized, 4)
+                    await db.trades.update_one(
+                        {"_id": trade["_id"]}, {"$set": update})
+                    logger.info(f"[PnL] {sym} kapatıldı — PnL: {realized}")

@@ -318,6 +318,22 @@ class BinanceFuturesClient:
         qty = risk_usdt / (price * sl_pct)
         return round(qty, 3)
 
+    async def get_trade_history(self, symbol: str, limit: int = 50) -> list:
+        """Kapalı trade geçmişi (realized PnL dahil)"""
+        try:
+            return await self._get("/fapi/v1/userTrades", {"symbol": symbol, "limit": limit})
+        except Exception as e:
+            logger.warning(f"Trade history {symbol}: {e}")
+            return []
+
+    async def get_income_history(self, income_type: str = "REALIZED_PNL", limit: int = 100) -> list:
+        """Gelir geçmişi"""
+        try:
+            return await self._get("/fapi/v1/income", {"incomeType": income_type, "limit": limit})
+        except Exception as e:
+            logger.warning(f"Income history: {e}")
+            return []
+
     def _format_quantity(self, qty: float, symbol: str) -> str:
         """Coin'e göre precision ayarla"""
         # Binance testnet minimum step size'ları

@@ -108,7 +108,7 @@ class Settings:
     )
 
     # Risk
-    MAX_LEVERAGE: int = _get_int("MAX_LEVERAGE", 10)
+    MAX_LEVERAGE: int = _get_int("MAX_LEVERAGE", 20)   # Railway: MAX_LEVERAGE=20
     DEFAULT_LEVERAGE: int = _get_int("DEFAULT_LEVERAGE", 3)
     MAX_POSITION_SIZE_USDT: float = _get_float("MAX_POSITION_SIZE_USDT", 100.0)
     MAX_OPEN_POSITIONS: int = _get_int("MAX_OPEN_POSITIONS", 5)
