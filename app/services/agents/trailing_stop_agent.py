@@ -175,3 +175,5 @@ class TrailingStopAgent:
                     await db.trades.update_one(
                         {"_id": trade["_id"]}, {"$set": update})
                     logger.info(f"[PnL] {sym} kapatıldı — PnL: {realized}")
+        except Exception as e:
+            logger.error(f"_sync_closed_pnl hatası: {e}")
